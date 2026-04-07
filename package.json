@@ -1,0 +1,48 @@
+{
+  "name": "pulsekeeper",
+  "version": "1.0.0",
+  "description": "PulseKeeper — keep your pulse on the content that matters. Aggregates X, YouTube, Spotify, podcasts, blogs, RSS feeds, newsletters, and web pages.",
+  "main": "src/main/index.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win",
+    "build:dir": "electron-builder --win --dir",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": ["electron", "rss", "content", "aggregator", "windows", "pulsekeeper"],
+  "author": "rod-trent",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/rod-trent/PulseKeeper.git"
+  },
+  "dependencies": {
+    "electron": "^41.1.1",
+    "rss-parser": "^3.13.0",
+    "node-cron": "^3.0.3",
+    "uuid": "^11.0.3",
+    "openai": "^4.77.0",
+    "marked": "^12.0.0",
+    "cheerio": "^1.0.0"
+  },
+  "devDependencies": {
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.rodtrent.pulsekeeper",
+    "productName": "PulseKeeper",
+    "win": {
+      "target": ["nsis"],
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "src/**/*",
+      "assets/**/*",
+      "scripts/**/*"
+    ]
+  }
+}
