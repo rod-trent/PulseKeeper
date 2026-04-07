@@ -558,7 +558,7 @@ function escapeHTML(s) {
 }
 
 function getSourceIcon(type) {
-  const m = { rss:'📡', podcast:'🎙️', youtube:'▶️', twitter:'🐦', newsletter:'📧', blog:'✍️', webpage:'🌐', 'web-capture':'🧩' };
+  const m = { rss:'📡', podcast:'🎙️', youtube:'▶️', twitter:'🐦', reddit:'🔴', newsletter:'📧', blog:'✍️', webpage:'🌐', 'web-capture':'🧩' };
   return m[type] || '📄';
 }
 

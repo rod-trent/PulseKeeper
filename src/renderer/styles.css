@@ -488,6 +488,7 @@ code { font-family: var(--font-mono); font-size: 12px; background: rgba(255,255,
 .type-podcast    { background: rgba(155, 89, 182, 0.15);  color: #c39bd3; }
 .type-youtube    { background: rgba(255, 0, 0, 0.15);     color: #ff6b6b; }
 .type-twitter    { background: rgba(29, 161, 242, 0.15);  color: #5bc8f5; }
+.type-reddit     { background: rgba(255, 69, 0, 0.15);    color: #ff7043; }
 .type-newsletter { background: rgba(0, 120, 212, 0.15);   color: var(--accent-light); }
 .type-blog       { background: rgba(46, 204, 113, 0.15);  color: #55d98d; }
 .type-webpage    { background: rgba(22, 160, 133, 0.15);  color: #48c9b0; }

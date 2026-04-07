@@ -3,6 +3,7 @@
 const { fetchRSS } = require('./rss');
 const { fetchYouTube } = require('./youtube');
 const { fetchTwitter } = require('./twitter');
+const { fetchReddit } = require('./reddit');
 const { fetchWebpage } = require('./webpage');
 
 const SOURCE_TYPES = [
@@ -10,7 +11,7 @@ const SOURCE_TYPES = [
     id: 'rss',
     label: 'RSS / Atom Feed',
     icon: 'rss',
-    description: 'Any RSS or Atom feed URL — including subreddit feeds like https://www.reddit.com/r/technology.rss',
+    description: 'Any RSS or Atom feed URL',
     fields: [
       { key: 'url', label: 'Feed URL', type: 'url', placeholder: 'https://example.com/feed.xml', required: true }
     ]
@@ -52,6 +53,16 @@ const SOURCE_TYPES = [
       { key: 'username', label: 'Username', type: 'text', placeholder: '@jolly (without @)', required: false },
       { key: 'searchQuery', label: 'Search Query', type: 'text', placeholder: '#topic OR from:user', required: false },
       { key: 'listId', label: 'List ID', type: 'text', placeholder: '123456789', required: false }
+    ]
+  },
+  {
+    id: 'reddit',
+    label: 'Reddit',
+    icon: 'reddit',
+    description: 'Subreddit posts — no API key required',
+    fields: [
+      { key: 'subreddit', label: 'Subreddit Name', type: 'text', placeholder: 'technology  (or r/technology)', required: true },
+      { key: 'sort', label: 'Sort By', type: 'select', options: ['hot', 'new', 'top', 'rising'], default: 'hot', required: false }
     ]
   },
   {
@@ -110,6 +121,8 @@ async function fetchSource(source) {
       return fetchYouTube(source);
     case 'twitter':
       return fetchTwitter(source);
+    case 'reddit':
+      return fetchReddit(source);
     case 'webpage':
       return fetchWebpage(source);
     case 'web-capture':

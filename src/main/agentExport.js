@@ -25,7 +25,7 @@ function buildAgentPack(settings) {
   return {
     version: '1.0',
     name: 'PulseKeeper Pack',
-    description: 'Collects and AI-summarizes content from your PulseKeeper sources: RSS, YouTube, X, newsletters, blogs, podcasts, web pages, and more.',
+    description: 'Collects and AI-summarizes content from your PulseKeeper sources: RSS, YouTube, X, Reddit, newsletters, blogs, podcasts, web pages, and more.',
     author: 'PulseKeeper',
     agents: [
       {
