@@ -2,16 +2,20 @@
 
 // Reddit via public JSON API (no API key required)
 const https = require('https');
+const zlib = require('zlib');
 
+// old.reddit.com is more permissive than www.reddit.com for unauthenticated access
 const REDDIT_JSON = (subreddit, sort, limit) =>
-  `https://www.reddit.com/r/${subreddit}/${sort}.json?limit=${limit}&raw_json=1`;
+  `https://old.reddit.com/r/${subreddit}/${sort}.json?limit=${limit}&raw_json=1`;
 
 function fetchJSON(url) {
   return new Promise((resolve, reject) => {
     const req = https.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'application/json'
+        // Reddit requires a descriptive non-browser UA; browser strings trigger 403
+        'User-Agent': 'windows:com.rodtrent.pulsekeeper:1.0.0 (by /u/pulsekeeper_app)',
+        'Accept': 'application/json',
+        'Accept-Encoding': 'gzip, deflate'
       }
     }, res => {
       if (res.statusCode !== 200) {
@@ -19,13 +23,20 @@ function fetchJSON(url) {
         reject(new Error(`Reddit returned HTTP ${res.statusCode} for ${url}`));
         return;
       }
+
+      const enc = res.headers['content-encoding'];
+      let stream = res;
+      if (enc === 'gzip')    stream = res.pipe(zlib.createGunzip());
+      else if (enc === 'deflate') stream = res.pipe(zlib.createInflate());
+
       let body = '';
-      res.setEncoding('utf8');
-      res.on('data', chunk => { body += chunk; });
-      res.on('end', () => {
+      stream.setEncoding('utf8');
+      stream.on('data', chunk => { body += chunk; });
+      stream.on('end', () => {
         try { resolve(JSON.parse(body)); }
         catch (e) { reject(new Error('Reddit JSON parse error')); }
       });
+      stream.on('error', reject);
     });
     req.on('error', reject);
     req.setTimeout(15000, () => { req.destroy(); reject(new Error('Reddit request timed out')); });
