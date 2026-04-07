@@ -3,7 +3,6 @@
 const { fetchRSS } = require('./rss');
 const { fetchYouTube } = require('./youtube');
 const { fetchTwitter } = require('./twitter');
-const { fetchSpotify } = require('./spotify');
 const { fetchReddit } = require('./reddit');
 const { fetchWebpage } = require('./webpage');
 
@@ -21,9 +20,11 @@ const SOURCE_TYPES = [
     id: 'podcast',
     label: 'Podcast',
     icon: 'mic',
-    description: 'Podcast RSS feed URL',
+    description: 'Any podcast RSS feed — no account needed. Paste the show\'s RSS URL (find it on the podcast\'s website, Apple Podcasts, Podchaser, or Listen Notes).',
     fields: [
-      { key: 'url', label: 'Podcast RSS URL', type: 'url', placeholder: 'https://feeds.example.com/podcast', required: true }
+      { key: 'url', label: 'Podcast RSS URL', type: 'url', placeholder: 'https://feeds.example.com/podcast',
+        hint: 'Tip: search "podcastname rss feed" or look it up on podchaser.com',
+        required: true }
     ]
   },
   {
@@ -52,19 +53,6 @@ const SOURCE_TYPES = [
       { key: 'username', label: 'Username', type: 'text', placeholder: '@jolly (without @)', required: false },
       { key: 'searchQuery', label: 'Search Query', type: 'text', placeholder: '#topic OR from:user', required: false },
       { key: 'listId', label: 'List ID', type: 'text', placeholder: '123456789', required: false }
-    ]
-  },
-  {
-    id: 'spotify',
-    label: 'Spotify',
-    icon: 'spotify',
-    description: 'Playlist, podcast show, or artist top tracks',
-    fields: [
-      { key: 'clientId', label: 'Client ID', type: 'text', placeholder: 'From developer.spotify.com', required: true },
-      { key: 'clientSecret', label: 'Client Secret', type: 'password', placeholder: 'From developer.spotify.com', required: true },
-      { key: 'playlistId', label: 'Playlist URL or ID', type: 'text', placeholder: 'https://open.spotify.com/playlist/... or bare ID', required: false },
-      { key: 'showId', label: 'Podcast Show URL or ID', type: 'text', placeholder: 'https://open.spotify.com/show/... or bare ID', required: false },
-      { key: 'artistId', label: 'Artist URL or ID', type: 'text', placeholder: 'https://open.spotify.com/artist/... or bare ID', required: false }
     ]
   },
   {
@@ -133,8 +121,6 @@ async function fetchSource(source) {
       return fetchYouTube(source);
     case 'twitter':
       return fetchTwitter(source);
-    case 'spotify':
-      return fetchSpotify(source);
     case 'reddit':
       return fetchReddit(source);
     case 'webpage':
