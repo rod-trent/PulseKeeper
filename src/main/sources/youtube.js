@@ -76,7 +76,16 @@ async function fetchYouTube(source) {
  * Fetches the channel page to extract the canonical RSS link if needed.
  */
 async function resolveToFeedURL(url) {
-  const trimmed = url.trim();
+  // Normalize: ensure www.youtube.com and strip tracking params (?si=, ?feature=, etc.)
+  let trimmed = url.trim();
+  try {
+    const u = new URL(trimmed);
+    // Canonicalize host: youtube.com → www.youtube.com
+    if (u.hostname === 'youtube.com') u.hostname = 'www.youtube.com';
+    // Strip known tracking-only params that confuse page fetches
+    for (const param of ['si', 'feature', 'ab_channel', 'pp']) u.searchParams.delete(param);
+    trimmed = u.toString();
+  } catch { /* malformed URL — leave as-is */ }
 
   // Already a YouTube RSS feed URL
   if (trimmed.includes('feeds/videos.xml')) return trimmed;
