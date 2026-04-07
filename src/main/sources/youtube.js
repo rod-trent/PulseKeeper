@@ -73,16 +73,13 @@ async function fetchYouTube(source) {
 
 /**
  * Convert any YouTube URL format to an RSS feed URL.
- * Fetches the channel page to extract the canonical RSS link if needed.
  */
 async function resolveToFeedURL(url) {
-  // Normalize: ensure www.youtube.com and strip tracking params (?si=, ?feature=, etc.)
+  // Normalize: ensure www.youtube.com and strip tracking params
   let trimmed = url.trim();
   try {
     const u = new URL(trimmed);
-    // Canonicalize host: youtube.com → www.youtube.com
     if (u.hostname === 'youtube.com') u.hostname = 'www.youtube.com';
-    // Strip known tracking-only params that confuse page fetches
     for (const param of ['si', 'feature', 'ab_channel', 'pp']) u.searchParams.delete(param);
     trimmed = u.toString();
   } catch { /* malformed URL — leave as-is */ }
@@ -102,15 +99,23 @@ async function resolveToFeedURL(url) {
     return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelIdMatch[1]}`;
   }
 
-  // @handle — try legacy ?user= RSS URL first (fast, no page fetch needed)
+  // @handle URL
   const handleMatch = trimmed.match(/\/@([\w-]+)/);
   if (handleMatch) {
     const handle = handleMatch[1];
+
+    // 1. Legacy ?user= RSS URL (fast, works for older channels)
     const legacyUrl = `https://www.youtube.com/feeds/videos.xml?user=${handle}`;
     try {
       await parser.parseURL(legacyUrl);
       return legacyUrl;
-    } catch { /* not a legacy username — fall through to page scraping */ }
+    } catch { /* not a legacy username — continue */ }
+
+    // 2. Innertube API — YouTube's own internal API, returns JSON with channel ID
+    try {
+      const channelId = await resolveHandleViaInnertube(handle);
+      return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+    } catch { /* fall through to HTML scraping */ }
   }
 
   // /c/name or /user/name — try ?user= with the path segment
@@ -123,24 +128,28 @@ async function resolveToFeedURL(url) {
     } catch { /* fall through */ }
   }
 
-  // Fetch the channel page and extract channel ID from the embedded JSON / link tags
+  // Last resort: fetch the channel page and extract channel ID via regex
   const pageUrl = trimmed.startsWith('http') ? trimmed : `https://www.youtube.com/${trimmed}`;
   const html = await fetchPageHTML(pageUrl);
 
   const patterns = [
-    // <link rel="alternate"> tag
+    // <link rel="alternate"> RSS tag in <head>
     { re: /type="application\/rss\+xml"[^>]+href="([^"]+feeds\/videos\.xml[^"]+)"/, full: true },
     { re: /href="([^"]+feeds\/videos\.xml[^"]+)"[^>]+type="application\/rss\+xml"/, full: true },
-    // ytInitialData / ytcfg embedded JSON — channel ID fields
-    { re: /"channelId"\s*:\s*"(UC[\w-]+)"/, full: false },
-    { re: /"externalChannelId"\s*:\s*"(UC[\w-]+)"/, full: false },
-    { re: /"browseId"\s*:\s*"(UC[\w-]+)"/, full: false },
     // Escaped feeds URL inside JSON strings
     { re: /feeds\\\/videos\.xml\?channel_id=(UC[\w-]+)/, full: false },
     { re: /"(https:\/\/www\.youtube\.com\/feeds\/videos\.xml\?channel_id=[^"\\]+)"/, full: true },
+    // ytInitialData / ytcfg embedded JSON — various channel ID fields
+    { re: /"externalId"\s*:\s*"(UC[\w-]+)"/, full: false },
+    { re: /"channelId"\s*:\s*"(UC[\w-]+)"/, full: false },
+    { re: /"externalChannelId"\s*:\s*"(UC[\w-]+)"/, full: false },
+    { re: /"browseId"\s*:\s*"(UC[\w-]+)"/, full: false },
+    { re: /"ucid"\s*:\s*"(UC[\w-]+)"/, full: false },
     // itemprop / meta tags
     { re: /itemprop="channelId"[^>]+content="(UC[\w-]+)"/, full: false },
     { re: /<meta[^>]+name="channelId"[^>]+content="(UC[\w-]+)"/, full: false },
+    // General UC id anywhere in page (last resort)
+    { re: /\b(UC[\w-]{22})\b/, full: false },
   ];
 
   for (const { re, full } of patterns) {
@@ -158,6 +167,99 @@ async function resolveToFeedURL(url) {
   );
 }
 
+/**
+ * Resolve a YouTube @handle to a channel ID using YouTube's innertube API.
+ * This is the most reliable method — it's the same JSON API the YouTube
+ * web client uses internally, accepts @handles directly, returns structured
+ * JSON with the channel ID clearly accessible. No API key required.
+ */
+function resolveHandleViaInnertube(handle) {
+  const body = JSON.stringify({
+    context: {
+      client: {
+        hl: 'en',
+        gl: 'US',
+        clientName: 'WEB',
+        clientVersion: '2.20240304.00.00'
+      }
+    },
+    browseId: `@${handle}`
+  });
+
+  return new Promise((resolve, reject) => {
+    const options = {
+      hostname: 'www.youtube.com',
+      path: '/youtubei/v1/browse?prettyPrint=false',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Origin': 'https://www.youtube.com',
+        'Referer': `https://www.youtube.com/@${handle}`,
+        'X-YouTube-Client-Name': '1',
+        'X-YouTube-Client-Version': '2.20240304.00.00',
+      }
+    };
+
+    const req = https.request(options, (res) => {
+      // Decompress response
+      const enc = res.headers['content-encoding'];
+      let stream = res;
+      if (enc === 'gzip')    stream = res.pipe(zlib.createGunzip());
+      else if (enc === 'deflate') stream = res.pipe(zlib.createInflate());
+      else if (enc === 'br') stream = res.pipe(zlib.createBrotliDecompress());
+
+      let data = '';
+      let settled = false;
+      const done = v => { if (!settled) { settled = true; resolve(v); } };
+      const fail = e => { if (!settled) { settled = true; reject(e); } };
+
+      stream.setEncoding('utf8');
+      stream.on('data', chunk => {
+        data += chunk;
+        if (data.length > 500000) { req.destroy(); }   // truncate — channel ID is always early in response
+      });
+      stream.on('end', () => {
+        if (!data) { fail(new Error('Empty innertube response')); return; }
+        try {
+          // Try structured parse first
+          let channelId = null;
+          try {
+            const json = JSON.parse(data);
+            channelId =
+              json?.metadata?.channelMetadataRenderer?.externalId ||
+              json?.header?.c4TabbedHeaderRenderer?.channelId ||
+              json?.header?.pageHeaderRenderer?.channelId;
+          } catch { /* JSON truncated — fall through to regex */ }
+
+          // Regex fallback on raw response string
+          if (!channelId || !channelId.startsWith('UC')) {
+            const m = data.match(/"externalId"\s*:\s*"(UC[\w-]+)"/)
+                   || data.match(/"channelId"\s*:\s*"(UC[\w-]+)"/)
+                   || data.match(/\b(UC[\w-]{22})\b/);
+            channelId = m?.[1] || null;
+          }
+
+          if (channelId) done(channelId);
+          else fail(new Error('Channel ID not found in innertube response'));
+        } catch (e) {
+          fail(e);
+        }
+      });
+      stream.on('error', fail);
+    });
+
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('Innertube request timed out')); });
+    req.write(body);
+    req.end();
+  });
+}
+
 function fetchPageHTML(url) {
   return new Promise((resolve, reject) => {
     const client = url.startsWith('https') ? https : http;
@@ -168,8 +270,8 @@ function fetchPageHTML(url) {
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
         'Cache-Control': 'no-cache',
-        // Bypass YouTube consent gate (EU / cookie consent screens)
-        'Cookie': 'CONSENT=YES+cb; YSC=irrelevant; VISITOR_INFO1_LIVE=irrelevant'
+        // Bypass YouTube consent gate
+        'Cookie': 'CONSENT=YES+cb; SOCS=CAESEwgDEgk2IgJlbg==; YSC=irrelevant; VISITOR_INFO1_LIVE=irrelevant'
       }
     }, (res) => {
       // Follow redirects
