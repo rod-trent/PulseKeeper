@@ -18,24 +18,20 @@ class Collector {
   }
 
   /**
-   * Collect from all enabled sources
+   * Collect from all enabled sources (batches of 3)
    * @returns {{ succeeded: number, failed: number, errors: object[] }}
    */
   async collectAll() {
     const sources = await this.storage.getSources();
     const enabled = sources.filter(s => s.enabled);
-
-    let succeeded = 0;
-    let failed = 0;
+    let succeeded = 0, failed = 0;
     const errors = [];
 
     this._emit({ type: 'start', total: enabled.length });
 
-    // Collect in batches of 3 to avoid overwhelming APIs
     for (let i = 0; i < enabled.length; i += 3) {
       const batch = enabled.slice(i, i + 3);
       const results = await Promise.allSettled(batch.map(s => this._collectOne(s)));
-
       for (let j = 0; j < results.length; j++) {
         const result = results[j];
         const source = batch[j];
@@ -56,23 +52,47 @@ class Collector {
   }
 
   /**
-   * Collect from a single source by ID
+   * Collect from a single source by ID (bypasses per-source interval check)
    */
   async collectOne(sourceId) {
     const sources = await this.storage.getSources();
     const source = sources.find(s => s.id === sourceId);
     if (!source) throw new Error(`Source ${sourceId} not found`);
-    return this._collectOne(source);
+    return this._collectOne(source, true); // force = true bypasses interval check
   }
 
-  async _collectOne(source) {
+  async _collectOne(source, force = false) {
     if (this._running.has(source.id)) return 0;
+
+    // Per-source refresh interval — skip if not due yet (unless forced via manual refresh)
+    if (!force && source.refreshInterval && source.refreshInterval > 0) {
+      const health = await this.storage.getSourceHealth();
+      const h = health[source.id];
+      if (h?.lastFetchedAt) {
+        const minsSince = (Date.now() - new Date(h.lastFetchedAt)) / 60000;
+        if (minsSince < source.refreshInterval) return 0;
+      }
+    }
+
     this._running.add(source.id);
 
     try {
-      const items = await fetchSource(source);
+      let items = await fetchSource(source);
 
-      // Deduplicate against existing items
+      // Apply mute words filter
+      const settings = await this.storage.getSettings();
+      const muteWords = (settings.muteWords || [])
+        .map(w => w.toLowerCase().trim())
+        .filter(Boolean);
+
+      if (muteWords.length) {
+        items = items.filter(item => {
+          const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
+          return !muteWords.some(w => text.includes(w));
+        });
+      }
+
+      // Deduplicate against existing cached items
       const existing = await this.storage.getContent(source.id);
       const existingIds = new Set(existing.map(i => i.id));
       const newItems = items.filter(i => !existingIds.has(i.id));
@@ -81,7 +101,21 @@ class Collector {
       const merged = [...newItems, ...existing].slice(0, (source.maxItems || 20) * 3);
       await this.storage.saveContent(source.id, merged);
 
+      // Update health
+      await this.storage.updateSourceHealth(source.id, {
+        lastFetchedAt: new Date().toISOString(),
+        lastNewCount: newItems.length,
+        totalCached: merged.length,
+        lastError: null
+      });
+
       return newItems.length;
+    } catch (e) {
+      await this.storage.updateSourceHealth(source.id, {
+        lastFetchedAt: new Date().toISOString(),
+        lastError: e.message
+      });
+      throw e;
     } finally {
       this._running.delete(source.id);
     }

@@ -5,17 +5,22 @@ const path = require('path');
 const os = require('os');
 const { v4: uuidv4 } = require('uuid');
 
-const DATA_DIR = path.join(os.homedir(), 'Documents', 'PulseKeeper');
-const SOURCES_FILE = path.join(DATA_DIR, 'sources.json');
+const DATA_DIR    = path.join(os.homedir(), 'Documents', 'PulseKeeper');
+const SOURCES_FILE  = path.join(DATA_DIR, 'sources.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const CONTENT_DIR = path.join(DATA_DIR, 'content');
-const OUTPUT_DIR = path.join(DATA_DIR, 'output');
+const OUTPUT_DIR  = path.join(DATA_DIR, 'output');
+const HISTORY_DIR = path.join(DATA_DIR, 'history');
+const READ_FILE   = path.join(DATA_DIR, 'read.json');
+const HEALTH_FILE = path.join(DATA_DIR, 'health.json');
 
 const DEFAULT_SETTINGS = {
   refreshInterval: 30,
   collectOnStartup: true,
   maxItemsPerSource: 20,
   outputFormat: 'html',
+  muteWords: [],
+  historyMaxCount: 10,
   llm: {
     enabled: false,
     provider: 'anthropic',
@@ -82,18 +87,14 @@ class Storage {
   }
 
   async init() {
-    for (const dir of [DATA_DIR, CONTENT_DIR, OUTPUT_DIR]) {
+    for (const dir of [DATA_DIR, CONTENT_DIR, OUTPUT_DIR, HISTORY_DIR]) {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     }
-    if (!fs.existsSync(SETTINGS_FILE)) {
-      await this._write(SETTINGS_FILE, DEFAULT_SETTINGS);
-    }
-    if (!fs.existsSync(SOURCES_FILE)) {
-      await this._write(SOURCES_FILE, DEFAULT_SOURCES);
-    }
+    if (!fs.existsSync(SETTINGS_FILE)) await this._write(SETTINGS_FILE, DEFAULT_SETTINGS);
+    if (!fs.existsSync(SOURCES_FILE))  await this._write(SOURCES_FILE, DEFAULT_SOURCES);
   }
 
-  // --- Settings ---
+  // ─── Settings ────────────────────────────────────────────────────────────────
   async getSettings() {
     try {
       const raw = fs.readFileSync(SETTINGS_FILE, 'utf8');
@@ -107,14 +108,12 @@ class Storage {
     await this._write(SETTINGS_FILE, settings);
   }
 
-  // --- Sources ---
+  // ─── Sources ─────────────────────────────────────────────────────────────────
   async getSources() {
     try {
       const raw = fs.readFileSync(SOURCES_FILE, 'utf8');
       return JSON.parse(raw);
-    } catch {
-      return [];
-    }
+    } catch { return []; }
   }
 
   async saveSources(sources) {
@@ -144,35 +143,34 @@ class Storage {
     await this.saveSources(sources);
     const contentFile = path.join(CONTENT_DIR, `${id}.json`);
     if (fs.existsSync(contentFile)) fs.unlinkSync(contentFile);
+    // Clean up health entry
+    const health = await this.getSourceHealth();
+    delete health[id];
+    await this._write(HEALTH_FILE, health);
   }
 
-  // --- Content Cache ---
+  // ─── Content Cache ────────────────────────────────────────────────────────────
   async getContent(sourceId) {
     const file = path.join(CONTENT_DIR, `${sourceId}.json`);
-    try {
-      const raw = fs.readFileSync(file, 'utf8');
-      return JSON.parse(raw);
-    } catch {
-      return [];
-    }
+    try { return JSON.parse(fs.readFileSync(file, 'utf8')); }
+    catch { return []; }
   }
 
   async saveContent(sourceId, items) {
-    const file = path.join(CONTENT_DIR, `${sourceId}.json`);
-    await this._write(file, items);
+    await this._write(path.join(CONTENT_DIR, `${sourceId}.json`), items);
   }
 
   async getAllContent() {
     const sources = await this.getSources();
     const allItems = [];
     for (const source of sources.filter(s => s.enabled)) {
-      const items = await this.getContent(source.id);
-      allItems.push(...items);
+      allItems.push(...(await this.getContent(source.id)));
     }
     allItems.sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
     return allItems;
   }
 
+  // ─── Output ───────────────────────────────────────────────────────────────────
   getOutputPath(format) {
     const ext = format === 'markdown' ? 'md' : format;
     return path.join(OUTPUT_DIR, `digest.${ext}`);
@@ -180,18 +178,104 @@ class Storage {
 
   async saveOutput(format, content) {
     const file = this.getOutputPath(format);
-    // PDF content is a Buffer — don't force utf8 encoding on binary data
-    if (Buffer.isBuffer(content)) {
-      fs.writeFileSync(file, content);
-    } else {
-      fs.writeFileSync(file, content, 'utf8');
-    }
+    if (Buffer.isBuffer(content)) fs.writeFileSync(file, content);
+    else fs.writeFileSync(file, content, 'utf8');
+    // Also save a timestamped copy to history
+    await this.saveHistory(format, content);
     return file;
   }
 
-  getDataDir() { return DATA_DIR; }
+  getDataDir()   { return DATA_DIR; }
   getOutputDir() { return OUTPUT_DIR; }
+  getHistoryDir(){ return HISTORY_DIR; }
 
+  // ─── Digest History ───────────────────────────────────────────────────────────
+  async saveHistory(format, content) {
+    if (!fs.existsSync(HISTORY_DIR)) fs.mkdirSync(HISTORY_DIR, { recursive: true });
+    const stamp = new Date().toISOString().slice(0, 16).replace('T', '_').replace(':', '-');
+    const ext = format === 'markdown' ? 'md' : format;
+    const file = path.join(HISTORY_DIR, `digest-${stamp}.${ext}`);
+    if (Buffer.isBuffer(content)) fs.writeFileSync(file, content);
+    else fs.writeFileSync(file, content, 'utf8');
+    const settings = await this.getSettings();
+    await this._pruneHistory(settings.historyMaxCount || 10);
+    return file;
+  }
+
+  async getHistory() {
+    if (!fs.existsSync(HISTORY_DIR)) return [];
+    return fs.readdirSync(HISTORY_DIR)
+      .filter(f => /^digest-.+\.(html|md|pdf)$/.test(f))
+      .sort().reverse()
+      .slice(0, 30)
+      .map(f => {
+        const label = f
+          .replace(/^digest-/, '')
+          .replace(/\.(html|md|pdf)$/, '')
+          .replace(/_/, ' ')
+          .replace(/-(\d{2})$/, ':$1');
+        return { file: f, path: path.join(HISTORY_DIR, f), label, ext: path.extname(f).slice(1) };
+      });
+  }
+
+  async _pruneHistory(maxCount) {
+    if (!fs.existsSync(HISTORY_DIR)) return;
+    const files = fs.readdirSync(HISTORY_DIR)
+      .filter(f => f.endsWith('.html') && f.startsWith('digest-'))
+      .sort();
+    while (files.length > maxCount) {
+      try { fs.unlinkSync(path.join(HISTORY_DIR, files.shift())); } catch {}
+    }
+  }
+
+  // ─── Read Tracking ────────────────────────────────────────────────────────────
+  async getReadIds() {
+    try { return new Set(JSON.parse(fs.readFileSync(READ_FILE, 'utf8'))); }
+    catch { return new Set(); }
+  }
+
+  async markRead(ids) {
+    const existing = await this.getReadIds();
+    for (const id of (Array.isArray(ids) ? ids : [ids])) existing.add(id);
+    await this._write(READ_FILE, [...existing].slice(-10000));
+  }
+
+  async markAllRead(itemIds) {
+    const existing = await this.getReadIds();
+    for (const id of itemIds) existing.add(id);
+    await this._write(READ_FILE, [...existing].slice(-10000));
+  }
+
+  // ─── Source Health ────────────────────────────────────────────────────────────
+  async getSourceHealth() {
+    try { return JSON.parse(fs.readFileSync(HEALTH_FILE, 'utf8')); }
+    catch { return {}; }
+  }
+
+  async updateSourceHealth(sourceId, data) {
+    const health = await this.getSourceHealth();
+    health[sourceId] = { ...(health[sourceId] || {}), ...data };
+    await this._write(HEALTH_FILE, health);
+  }
+
+  // ─── Backup ───────────────────────────────────────────────────────────────────
+  async exportBackup() {
+    const sources = await this.getSources();
+    const settings = await this.getSettings();
+    return JSON.stringify(
+      { version: '1.0', exportedAt: new Date().toISOString(), sources, settings },
+      null, 2
+    );
+  }
+
+  async importBackup(json) {
+    const bundle = JSON.parse(json);
+    if (!bundle.sources || !bundle.settings) throw new Error('Invalid backup file — missing sources or settings');
+    await this.saveSources(bundle.sources);
+    await this.saveSettings(bundle.settings);
+  }
+
+  // ─── Internal ────────────────────────────────────────────────────────────────
   async _write(file, data) {
     const tmp = file + '.tmp';
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2), 'utf8');

@@ -29,7 +29,7 @@
       box-shadow: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(96,205,255,0.08);
     }
     .popup-header {
-      padding: 12px 16px;
+      padding: 10px 14px;
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
@@ -42,9 +42,9 @@
       display: flex; align-items: center; gap: 8px;
     }
     .pk-logo { width: 18px; height: 18px; }
-    .popup-actions { display: flex; gap: 5px; }
+    .popup-actions { display: flex; gap: 4px; align-items: center; }
     .popup-btn {
-      padding: 4px 11px; border-radius: 6px; font-size: 11px; font-family: var(--font);
+      padding: 4px 10px; border-radius: 6px; font-size: 11px; font-family: var(--font);
       cursor: pointer; border: 1px solid var(--border); background: rgba(255,255,255,0.06);
       color: var(--text2); transition: all 0.15s;
     }
@@ -52,8 +52,8 @@
     .popup-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
     .popup-btn.primary:hover { background: #006cbe; }
     .filter-row {
-      padding: 7px 12px; border-bottom: 1px solid var(--border);
-      display: flex; gap: 4px; overflow-x: auto; flex-shrink: 0;
+      padding: 6px 12px; border-bottom: 1px solid var(--border);
+      display: flex; gap: 4px; overflow-x: auto; flex-shrink: 0; align-items: center;
     }
     .filter-row::-webkit-scrollbar { height: 0; }
     .filter-chip {
@@ -67,6 +67,8 @@
     .items-list::-webkit-scrollbar-thumb { background: rgba(96,205,255,0.15); border-radius: 2px; }
     .item { display: flex; gap: 10px; padding: 9px 14px; cursor: pointer; transition: background 0.12s; border-bottom: 1px solid rgba(255,255,255,0.03); }
     .item:hover { background: rgba(96,205,255,0.04); }
+    .item.read { opacity: 0.45; }
+    .item.read:hover { opacity: 0.7; }
     .item-thumb { width: 52px; height: 38px; border-radius: 5px; object-fit: cover; flex-shrink: 0; background: rgba(255,255,255,0.06); }
     .item-icon { width: 52px; height: 38px; border-radius: 5px; flex-shrink: 0; background: rgba(255,255,255,0.05); display: flex; align-items: center; justify-content: center; font-size: 18px; }
     .item-body { flex: 1; min-width: 0; }
@@ -82,6 +84,8 @@
     .status-dot { width: 6px; height: 6px; border-radius: 50%; background: #107c10; display: inline-block; margin-right: 5px; }
     .status-dot.collecting { background: var(--accent-light); animation: pulse 1s infinite; }
     @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.3; } }
+    .copy-toast { position: fixed; bottom: 44px; left: 50%; transform: translateX(-50%); background: rgba(16,124,16,0.9); color: white; padding: 4px 14px; border-radius: 20px; font-size: 11px; opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+    .copy-toast.show { opacity: 1; }
   </style>
 </head>
 <body>
@@ -96,13 +100,15 @@
       PulseKeeper
     </div>
     <div class="popup-actions">
-      <button class="popup-btn" onclick="window.pcbAPI.sources.collectAll().then(refresh)" title="Refresh">🔄</button>
+      <button class="popup-btn" id="btnCopy" title="Copy visible items as Markdown">📋</button>
+      <button class="popup-btn" id="btnMarkAllRead" title="Mark all as read">✓ Read</button>
+      <button class="popup-btn" id="btnRefreshPopup" title="Refresh">🔄</button>
       <button class="popup-btn" onclick="window.pcbAPI.ui.openSettings()" title="Settings">⚙️</button>
-      <button class="popup-btn primary" onclick="window.pcbAPI.output.openDigest();window.pcbAPI.popup.close()">View All</button>
+      <button class="popup-btn primary" id="btnViewAll">View All</button>
     </div>
   </div>
   <div class="filter-row" id="filterRow">
-    <button class="filter-chip active" data-type="all" onclick="setFilter('all',this)">All</button>
+    <button class="filter-chip active" data-type="all">All</button>
   </div>
   <div class="items-list" id="itemsList">
     <div class="loading"><div class="spinner"></div><span>Loading…</span></div>
@@ -112,6 +118,7 @@
     <span id="itemCount">0 items</span>
   </div>
 </div>
+<div class="copy-toast" id="copyToast">Copied to clipboard!</div>
 <script src="popup.js"></script>
 </body>
 </html>

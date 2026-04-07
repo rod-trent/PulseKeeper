@@ -49,6 +49,7 @@
         <span>About</span>
       </div>
     </div>
+    <button class="theme-toggle-btn" id="btnThemeToggle" title="Toggle light/dark theme">🌙 Dark Mode</button>
     <div class="sidebar-footer" id="statusBar">Ready</div>
   </nav>
 
@@ -140,6 +141,20 @@
             </div>
           </div>
         </div>
+        <div class="card">
+          <div class="card-header"><h3>🔇 Mute Words</h3></div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+            <p style="font-size:12px">Items whose title or description contains any of these words will be hidden. Separate with commas.</p>
+            <textarea class="textarea mute-textarea" id="settingMuteWords" placeholder="sponsored, advertisement, clickbait…"></textarea>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><h3>💾 Backup &amp; Restore</h3></div>
+          <div class="card-body" style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-secondary" id="btnExportBackup">⬆️ Export Backup</button>
+            <button class="btn btn-secondary" id="btnImportBackup">⬇️ Import Backup</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -228,6 +243,17 @@
           <div class="card-body" style="display:flex;gap:8px">
             <button class="btn btn-secondary" onclick="window.pcbAPI.ui.openDataDir()">Open Data Folder</button>
             <button class="btn btn-secondary" onclick="window.pcbAPI.ui.openOutputDir()">Open Output Folder</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>🕒 Digest History</h3>
+            <span style="font-size:11px;color:var(--text-disabled)">Last 10 HTML digests</span>
+          </div>
+          <div class="card-body">
+            <div class="history-list" id="historyList">
+              <div style="color:var(--text-disabled);font-size:12px">Loading…</div>
+            </div>
           </div>
         </div>
       </div>
@@ -339,9 +365,16 @@
         <label class="form-label">Display Name</label>
         <input type="text" class="input" id="sourceName" placeholder="e.g. Jolly's Channel">
       </div>
-      <div class="form-group">
-        <label class="form-label">Max Items</label>
-        <input type="number" class="input" id="sourceMaxItems" value="20" min="1" max="200">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Max Items</label>
+          <input type="number" class="input" id="sourceMaxItems" value="20" min="1" max="200">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Refresh Interval (min)</label>
+          <input type="number" class="input" id="sourceRefreshInterval" value="0" min="0" max="1440" placeholder="0 = use global">
+          <div class="form-hint">0 = use the global schedule</div>
+        </div>
       </div>
       <div id="sourceFields"></div>
     </div>

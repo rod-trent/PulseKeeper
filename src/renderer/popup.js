@@ -5,27 +5,43 @@ const api = window.pcbAPI;
 const SOURCE_COLORS = {
   rss: '#f26522', podcast: '#9b59b6', youtube: '#ff0000',
   twitter: '#1da1f2', spotify: '#1db954', reddit: '#ff4500',
-  newsletter: '#0078d4', blog: '#2ecc71'
+  newsletter: '#0078d4', blog: '#2ecc71', webpage: '#16a085', 'web-capture': '#8e44ad'
 };
 const SOURCE_ICONS = {
   rss:'📡', podcast:'🎙️', youtube:'▶️', twitter:'🐦',
-  spotify:'🎵', reddit:'🔴', newsletter:'📧', blog:'✍️'
+  spotify:'🎵', reddit:'🔴', newsletter:'📧', blog:'✍️', webpage:'🌐', 'web-capture':'🧩'
 };
 
 let allItems = [];
+let readIds = new Set();
 let activeFilter = 'all';
 
 async function init() {
   await refresh();
 
+  // Delegated filter chip clicks
+  document.getElementById('filterRow').addEventListener('click', e => {
+    const chip = e.target.closest('[data-type]');
+    if (chip) setFilter(chip.dataset.type, chip);
+  });
+
+  // Header button handlers
+  document.getElementById('btnRefreshPopup').addEventListener('click', () => {
+    api.sources.collectAll().then(refresh);
+  });
+  document.getElementById('btnViewAll').addEventListener('click', () => {
+    api.output.openDigest(); api.popup.close();
+  });
+  document.getElementById('btnMarkAllRead').addEventListener('click', markAllRead);
+  document.getElementById('btnCopy').addEventListener('click', copyToClipboard);
+
   api.on.collectStart(() => {
     document.getElementById('statusDot').className = 'status-dot collecting';
     document.getElementById('statusText').textContent = 'Collecting…';
   });
-
-  api.on.collectComplete(({ succeeded }) => {
+  api.on.collectComplete(() => {
     document.getElementById('statusDot').className = 'status-dot';
-    document.getElementById('statusText').textContent = `Updated`;
+    document.getElementById('statusText').textContent = 'Updated';
     refresh();
   });
 }
@@ -33,44 +49,44 @@ async function init() {
 async function refresh() {
   const list = document.getElementById('itemsList');
   list.innerHTML = '<div class="loading"><div class="spinner"></div><span>Loading…</span></div>';
-
   try {
-    allItems = await api.popup.getLatest();
+    [allItems, readIds] = await Promise.all([
+      api.popup.getLatest(),
+      api.content.getReadIds().then(arr => new Set(arr))
+    ]);
     renderFilters();
     renderItems();
   } catch (e) {
-    list.innerHTML = `<div class="empty">Failed to load content<br><small>${e.message}</small></div>`;
+    list.innerHTML = `<div class="empty">Failed to load<br><small>${escHTML(e.message)}</small></div>`;
   }
 }
 
 function renderFilters() {
   const types = [...new Set(allItems.map(i => i.sourceType).filter(Boolean))];
   const row = document.getElementById('filterRow');
-  const existing = row.querySelector('[data-type="all"]');
   row.innerHTML = '';
 
-  const allChip = document.createElement('button');
-  allChip.className = `filter-chip ${activeFilter === 'all' ? 'active' : ''}`;
-  allChip.dataset.type = 'all';
-  allChip.textContent = `All (${allItems.length})`;
-  allChip.onclick = () => setFilter('all', allChip);
+  const allChip = makeChip('all', `All (${allItems.length})`, activeFilter === 'all');
   row.appendChild(allChip);
 
   for (const type of types) {
     const count = allItems.filter(i => i.sourceType === type).length;
-    const chip = document.createElement('button');
-    chip.className = `filter-chip ${activeFilter === type ? 'active' : ''}`;
-    chip.dataset.type = type;
-    chip.textContent = `${SOURCE_ICONS[type] || '📄'} ${type} (${count})`;
-    chip.onclick = () => setFilter(type, chip);
-    row.appendChild(chip);
+    row.appendChild(makeChip(type, `${SOURCE_ICONS[type] || '📄'} ${type} (${count})`, activeFilter === type));
   }
+}
+
+function makeChip(type, label, active) {
+  const btn = document.createElement('button');
+  btn.className = `filter-chip ${active ? 'active' : ''}`;
+  btn.dataset.type = type;
+  btn.textContent = label;
+  return btn;
 }
 
 function setFilter(type, el) {
   activeFilter = type;
   document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
-  el.classList.add('active');
+  if (el) el.classList.add('active');
   renderItems();
 }
 
@@ -83,30 +99,34 @@ function renderItems() {
   document.getElementById('itemCount').textContent = `${filtered.length} items`;
 
   if (!filtered.length) {
-    list.innerHTML = '<div class="empty">No content yet<br><small>Click refresh to fetch your sources</small></div>';
+    list.innerHTML = '<div class="empty">No content yet<br><small>Click 🔄 to fetch your sources</small></div>';
     return;
   }
 
-  list.innerHTML = filtered.map(item => renderItem(item)).join('');
+  list.innerHTML = filtered.map((item, i) => renderItem(item, i)).join('');
 
-  // Wire up click handlers
+  // Wire click to open URL and mark read
   list.querySelectorAll('.item').forEach((el, i) => {
     el.addEventListener('click', () => {
       const item = filtered[i];
       api.ui.openExternal(item.url);
+      readIds.add(item.id);
+      el.classList.add('read');
+      api.content.markRead([item.id]);
     });
   });
 }
 
-function renderItem(item) {
+function renderItem(item, i) {
   const color = SOURCE_COLORS[item.sourceType] || '#666';
   const icon = SOURCE_ICONS[item.sourceType] || '📄';
   const dateStr = relativeTime(item.publishedAt);
+  const isRead = readIds.has(item.id);
   const thumb = item.thumbnail
     ? `<img class="item-thumb" src="${escHTML(item.thumbnail)}" alt="" onerror="this.style.display='none'">`
     : `<div class="item-icon">${icon}</div>`;
 
-  return `<div class="item">
+  return `<div class="item${isRead ? ' read' : ''}" data-index="${i}">
     ${thumb}
     <div class="item-body">
       <div class="item-title">${escHTML(item.title)}</div>
@@ -118,11 +138,38 @@ function renderItem(item) {
   </div>`;
 }
 
+async function markAllRead() {
+  await api.content.markAllRead();
+  const items = activeFilter === 'all' ? allItems : allItems.filter(i => i.sourceType === activeFilter);
+  items.forEach(i => readIds.add(i.id));
+  document.querySelectorAll('.item').forEach(el => el.classList.add('read'));
+}
+
+async function copyToClipboard() {
+  const filtered = activeFilter === 'all'
+    ? allItems
+    : allItems.filter(i => i.sourceType === activeFilter);
+
+  if (!filtered.length) return;
+
+  const md = `# PulseKeeper — ${new Date().toLocaleDateString()}\n\n` +
+    filtered.map(i =>
+      `## [${i.title}](${i.url})\n_${i.sourceName} · ${relativeTime(i.publishedAt)}_\n\n${i.description || ''}`
+    ).join('\n\n---\n\n');
+
+  try {
+    await navigator.clipboard.writeText(md);
+    const toast = document.getElementById('copyToast');
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  } catch {}
+}
+
 function relativeTime(dateStr) {
   if (!dateStr) return '';
   try {
     const diff = Date.now() - new Date(dateStr).getTime();
-    if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
+    if (diff < 3600000)  return `${Math.floor(diff / 60000)}m ago`;
     if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
     if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
     return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });

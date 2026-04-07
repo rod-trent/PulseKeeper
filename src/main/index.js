@@ -17,6 +17,7 @@ const { generateDigest, getProviders } = require('./llmClient');
 const { exportPack } = require('./agentExport');
 const { SOURCE_TYPES } = require('./sources/index');
 const { CaptureServer } = require('./server');
+const { discoverFeed } = require('./sources/rssDiscover');
 
 // ─── App setup ────────────────────────────────────────────────────────────────
 app.setAppUserModelId('com.rodtrent.pulsekeeper');
@@ -35,6 +36,8 @@ let collector = null;
 let scheduler = null;
 let captureServer = null;
 let isCollecting = false;
+let unreadCount = 0;
+let lastViewedAt = new Date(0);
 
 // ─── App ready ────────────────────────────────────────────────────────────────
 app.on('second-instance', () => {
@@ -60,7 +63,7 @@ app.whenReady().then(async () => {
     } else if (evt.type === 'complete') {
       isCollecting = false;
       broadcastToAll('collect:complete', evt);
-      updateTrayTooltip();
+      updateUnreadBadge();
       storage.getSettings().then(s => {
         if (s.notifications?.onRefresh) {
           notify('PulseKeeper Updated', `${evt.succeeded} source${evt.succeeded !== 1 ? 's' : ''} refreshed.`);
@@ -115,20 +118,42 @@ function buildContextMenu() {
 
 function updateTrayTooltip(text) {
   if (!tray) return;
-  tray.setToolTip(text || 'PulseKeeper');
+  tray.setToolTip(text || (unreadCount > 0 ? `PulseKeeper — ${unreadCount} new` : 'PulseKeeper'));
   tray.setContextMenu(buildContextMenu());
 }
 
 // ─── Popup (left-click tray) ──────────────────────────────────────────────────
 function togglePopup() {
   if (popupWin && !popupWin.isDestroyed()) {
-    popupWin.isVisible() ? popupWin.hide() : showPopup();
+    if (popupWin.isVisible()) { popupWin.hide(); return; }
+    showPopup();
     return;
   }
   createPopup();
 }
 
+async function updateUnreadBadge() {
+  if (!tray) return;
+  try {
+    const items = await storage.getAllContent();
+    unreadCount = items.filter(i => new Date(i.fetchedAt || i.publishedAt) > lastViewedAt).length;
+    tray.setImage(makePKIcon(16, unreadCount));
+    tray.setToolTip(unreadCount > 0 ? `PulseKeeper — ${unreadCount} new item${unreadCount !== 1 ? 's' : ''}` : 'PulseKeeper');
+    tray.setContextMenu(buildContextMenu());
+  } catch {}
+}
+
+function markPopupViewed() {
+  lastViewedAt = new Date();
+  unreadCount = 0;
+  if (tray) {
+    tray.setImage(makePKIcon(16, 0));
+    tray.setToolTip('PulseKeeper');
+  }
+}
+
 function createPopup() {
+  markPopupViewed();
   const { x, y } = getPopupPosition();
   popupWin = new BrowserWindow({
     width: 420,
@@ -152,6 +177,7 @@ function createPopup() {
 
 function showPopup() {
   if (!popupWin || popupWin.isDestroyed()) return createPopup();
+  markPopupViewed();
   const { x, y } = getPopupPosition();
   popupWin.setPosition(x, y);
   popupWin.show();
@@ -305,6 +331,52 @@ function setupIPC() {
 
   ipcMain.handle('popup:close', () => { if (popupWin) popupWin.hide(); });
   ipcMain.handle('popup:getLatest', async () => (await storage.getAllContent()).slice(0, 100));
+
+  // Read tracking
+  ipcMain.handle('content:getReadIds', async () => [...(await storage.getReadIds())]);
+  ipcMain.handle('content:markRead', (_, ids) => storage.markRead(ids));
+  ipcMain.handle('content:markAllRead', async () => {
+    const items = await storage.getAllContent();
+    await storage.markAllRead(items.map(i => i.id));
+  });
+
+  // Source health
+  ipcMain.handle('sources:getHealth', () => storage.getSourceHealth());
+
+  // RSS auto-discovery
+  ipcMain.handle('sources:discoverFeed', (_, url) => discoverFeed(url));
+
+  // Digest history
+  ipcMain.handle('digest:getHistory', () => storage.getHistory());
+  ipcMain.handle('digest:openHistory', (_, filePath) => shell.openPath(filePath));
+
+  // Settings backup / restore
+  ipcMain.handle('settings:exportBackup', async () => {
+    const json = await storage.exportBackup();
+    const result = await dialog.showSaveDialog({
+      title: 'Export PulseKeeper Backup',
+      defaultPath: path.join(os.homedir(), 'Documents', `PulseKeeper-backup-${new Date().toISOString().slice(0,10)}.json`),
+      filters: [{ name: 'JSON Backup', extensions: ['json'] }]
+    });
+    if (result.canceled) return;
+    fs.writeFileSync(result.filePath, json, 'utf8');
+    notify('Backup Exported', path.basename(result.filePath));
+    shell.showItemInFolder(result.filePath);
+  });
+
+  ipcMain.handle('settings:importBackup', async () => {
+    const result = await dialog.showOpenDialog({
+      title: 'Import PulseKeeper Backup',
+      filters: [{ name: 'JSON Backup', extensions: ['json'] }],
+      properties: ['openFile']
+    });
+    if (result.canceled || !result.filePaths.length) return;
+    const json = fs.readFileSync(result.filePaths[0], 'utf8');
+    await storage.importBackup(json);
+    await scheduler.restart();
+    notify('Backup Restored', 'Sources and settings have been restored.');
+    broadcastToAll('backup:imported', {});
+  });
 }
 
 function broadcastToAll(channel, data) {
@@ -316,7 +388,7 @@ function broadcastToAll(channel, data) {
 }
 
 // ─── PulseKeeper Icon (programmatic PNG) ──────────────────────────────────────
-function makePKIcon(size = 16) {
+function makePKIcon(size = 16, badge = 0) {
   const s = size;
   const buf = new Array(s * s * 4).fill(0);
 
@@ -364,6 +436,18 @@ function makePKIcon(size = 16) {
 
   // Peak dot emphasis
   set(Math.round(t(26)), Math.round(t(16)), 150, 230, 255);
+
+  // Unread badge — red circle in top-right corner
+  if (badge > 0) {
+    const dotR = Math.max(2, Math.round(s * 0.22));
+    const cx = s - dotR - 1;
+    const cy = dotR + 1;
+    for (let dy = -dotR; dy <= dotR; dy++) {
+      for (let dx = -dotR; dx <= dotR; dx++) {
+        if (dx * dx + dy * dy <= dotR * dotR) set(cx + dx, cy + dy, 232, 17, 35);
+      }
+    }
+  }
 
   return bufToPNG(buf, s);
 }

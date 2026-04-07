@@ -4,7 +4,7 @@
   "description": "PulseKeeper — keep your pulse on the content that matters. Aggregates X, YouTube, Spotify, podcasts, blogs, RSS feeds, newsletters, and web pages.",
   "main": "src/main/index.js",
   "scripts": {
-    "start": "electron .",
+    "start": "electron --no-deprecation .",
     "build": "electron-builder --win",
     "build:dir": "electron-builder --win --dir",
     "postinstall": "electron-builder install-app-deps"
