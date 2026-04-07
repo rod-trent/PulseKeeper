@@ -93,23 +93,45 @@ async function resolveToFeedURL(url) {
     return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelIdMatch[1]}`;
   }
 
-  // @handle, /c/name, /user/name — need to fetch the page to get the real channel ID
-  // YouTube embeds the RSS feed URL in the page <head>
+  // @handle — try legacy ?user= RSS URL first (fast, no page fetch needed)
+  const handleMatch = trimmed.match(/\/@([\w-]+)/);
+  if (handleMatch) {
+    const handle = handleMatch[1];
+    const legacyUrl = `https://www.youtube.com/feeds/videos.xml?user=${handle}`;
+    try {
+      await parser.parseURL(legacyUrl);
+      return legacyUrl;
+    } catch { /* not a legacy username — fall through to page scraping */ }
+  }
+
+  // /c/name or /user/name — try ?user= with the path segment
+  const userMatch = trimmed.match(/\/(?:c|user)\/([\w-]+)/);
+  if (userMatch) {
+    const legacyUrl = `https://www.youtube.com/feeds/videos.xml?user=${userMatch[1]}`;
+    try {
+      await parser.parseURL(legacyUrl);
+      return legacyUrl;
+    } catch { /* fall through */ }
+  }
+
+  // Fetch the channel page and extract channel ID from the embedded JSON / link tags
   const pageUrl = trimmed.startsWith('http') ? trimmed : `https://www.youtube.com/${trimmed}`;
   const html = await fetchPageHTML(pageUrl);
 
-  // Try multiple patterns to extract channel ID or RSS feed URL from page source
   const patterns = [
-    // <link> tag variations
+    // <link rel="alternate"> tag
     { re: /type="application\/rss\+xml"[^>]+href="([^"]+feeds\/videos\.xml[^"]+)"/, full: true },
     { re: /href="([^"]+feeds\/videos\.xml[^"]+)"[^>]+type="application\/rss\+xml"/, full: true },
-    // Embedded JSON (ytInitialData / ytcfg)
+    // ytInitialData / ytcfg embedded JSON — channel ID fields
     { re: /"channelId"\s*:\s*"(UC[\w-]+)"/, full: false },
     { re: /"externalChannelId"\s*:\s*"(UC[\w-]+)"/, full: false },
     { re: /"browseId"\s*:\s*"(UC[\w-]+)"/, full: false },
-    // feeds URL in JSON (escaped or plain)
+    // Escaped feeds URL inside JSON strings
     { re: /feeds\\\/videos\.xml\?channel_id=(UC[\w-]+)/, full: false },
     { re: /"(https:\/\/www\.youtube\.com\/feeds\/videos\.xml\?channel_id=[^"\\]+)"/, full: true },
+    // itemprop / meta tags
+    { re: /itemprop="channelId"[^>]+content="(UC[\w-]+)"/, full: false },
+    { re: /<meta[^>]+name="channelId"[^>]+content="(UC[\w-]+)"/, full: false },
   ];
 
   for (const { re, full } of patterns) {
@@ -136,7 +158,9 @@ function fetchPageHTML(url) {
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         'Accept-Language': 'en-US,en;q=0.9',
         'Accept-Encoding': 'gzip, deflate, br',
-        'Cache-Control': 'no-cache'
+        'Cache-Control': 'no-cache',
+        // Bypass YouTube consent gate (EU / cookie consent screens)
+        'Cookie': 'CONSENT=YES+cb; YSC=irrelevant; VISITOR_INFO1_LIVE=irrelevant'
       }
     }, (res) => {
       // Follow redirects
