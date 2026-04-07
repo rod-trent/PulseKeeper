@@ -25,39 +25,6 @@ app.setName('PulseKeeper');
 
 // Resolved once at startup; works in both dev (repo root) and packaged (inside asar).
 const APP_ICON_PATH = path.join(__dirname, '../../assets/icon.ico');
-const APP_ICON_PNG  = path.join(__dirname, '../../assets/icon.png');
-
-// Reliable tray icon using the actual image file + Electron's native bitmap API.
-// Replaces the hand-rolled PNG encoder which Windows couldn't always parse.
-let _baseTrayIcon16 = null;
-function makeTrayIcon(badge = 0) {
-  if (!_baseTrayIcon16) {
-    _baseTrayIcon16 = nativeImage.createFromPath(APP_ICON_PNG).resize({ width: 16, height: 16 });
-  }
-  if (badge === 0) return _baseTrayIcon16;
-
-  // Copy the bitmap (BGRA) and paint a red dot in the top-right corner.
-  const size   = 16;
-  const bitmap = Buffer.from(_baseTrayIcon16.getBitmap()); // returns raw BGRA Buffer
-  const dotR   = 3;
-  const cx = size - dotR - 1;
-  const cy = dotR + 1;
-  for (let dy = -dotR; dy <= dotR; dy++) {
-    for (let dx = -dotR; dx <= dotR; dx++) {
-      if (dx * dx + dy * dy <= dotR * dotR) {
-        const px = cx + dx, py = cy + dy;
-        if (px >= 0 && px < size && py >= 0 && py < size) {
-          const i = (py * size + px) * 4;
-          bitmap[i]     = 35;   // B
-          bitmap[i + 1] = 17;   // G
-          bitmap[i + 2] = 232;  // R
-          bitmap[i + 3] = 255;  // A
-        }
-      }
-    }
-  }
-  return nativeImage.createFromBitmap(bitmap, { width: size, height: size });
-}
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { app.quit(); }
@@ -134,7 +101,7 @@ app.on('window-all-closed', e => e.preventDefault());
 
 // ─── Tray ─────────────────────────────────────────────────────────────────────
 function createTray() {
-  tray = new Tray(makeTrayIcon(0));
+  tray = new Tray(makePKIcon(16));
   tray.setToolTip('PulseKeeper');
   tray.setContextMenu(buildContextMenu());
   tray.on('click', () => togglePopup());
@@ -177,7 +144,7 @@ async function updateUnreadBadge() {
   try {
     const items = await storage.getAllContent();
     unreadCount = items.filter(i => new Date(i.fetchedAt || i.publishedAt) > lastViewedAt).length;
-    tray.setImage(makeTrayIcon(unreadCount));
+    tray.setImage(makePKIcon(16, unreadCount));
     tray.setToolTip(unreadCount > 0 ? `PulseKeeper — ${unreadCount} new item${unreadCount !== 1 ? 's' : ''}` : 'PulseKeeper');
     tray.setContextMenu(buildContextMenu());
   } catch {}
@@ -187,7 +154,7 @@ function markPopupViewed() {
   lastViewedAt = new Date();
   unreadCount = 0;
   if (tray) {
-    tray.setImage(makeTrayIcon(0));
+    tray.setImage(makePKIcon(16, 0));
     tray.setToolTip('PulseKeeper');
   }
 }
@@ -328,7 +295,7 @@ async function exportToAgentPlatform() {
 // ─── Notifications ─────────────────────────────────────────────────────────────
 function notify(title, body) {
   if (!Notification.isSupported()) return;
-  new Notification({ title, body, icon: APP_ICON_PATH }).show();
+  new Notification({ title, body, icon: makePKIcon(32) }).show();
 }
 
 // ─── IPC ───────────────────────────────────────────────────────────────────────

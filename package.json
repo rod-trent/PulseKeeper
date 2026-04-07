@@ -5,12 +5,21 @@
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron --no-deprecation .",
+    "generate-ico": "node scripts/generate-ico.js",
+    "prebuild": "node scripts/generate-ico.js",
     "build": "electron-builder --win",
     "build:dir": "electron-builder --win --dir",
     "build:portable": "electron-builder --win portable",
     "postinstall": "electron-builder install-app-deps"
   },
-  "keywords": ["electron", "rss", "content", "aggregator", "windows", "pulsekeeper"],
+  "keywords": [
+    "electron",
+    "rss",
+    "content",
+    "aggregator",
+    "windows",
+    "pulsekeeper"
+  ],
   "author": "rod-trent",
   "license": "MIT",
   "repository": {
@@ -18,16 +27,17 @@
     "url": "https://github.com/rod-trent/PulseKeeper.git"
   },
   "dependencies": {
-    "rss-parser": "^3.13.0",
-    "node-cron": "^3.0.3",
-    "uuid": "^11.0.3",
-    "openai": "^4.77.0",
+    "cheerio": "^1.0.0",
     "marked": "^12.0.0",
-    "cheerio": "^1.0.0"
+    "node-cron": "^3.0.3",
+    "openai": "^4.77.0",
+    "rss-parser": "^3.13.0",
+    "uuid": "^11.0.3"
   },
   "devDependencies": {
     "electron": "^41.1.1",
-    "electron-builder": "^26.8.1"
+    "electron-builder": "^26.8.1",
+    "png-to-ico": "^3.0.1"
   },
   "build": {
     "appId": "com.rodtrent.pulsekeeper",
@@ -35,8 +45,18 @@
     "artifactName": "PulseKeeper-Setup-${version}.${ext}",
     "win": {
       "target": [
-        { "target": "nsis",     "arch": ["x64"] },
-        { "target": "portable", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
       ],
       "icon": "assets/icon.ico"
     },
@@ -60,11 +80,11 @@
     "extraResources": [
       {
         "from": "scripts/",
-        "to":   "scripts/"
+        "to": "scripts/"
       },
       {
         "from": "extension/",
-        "to":   "extension/"
+        "to": "extension/"
       }
     ]
   }
