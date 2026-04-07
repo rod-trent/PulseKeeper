@@ -326,6 +326,7 @@ function setupIPC() {
   ipcMain.handle('ui:openDigest', () => openDigest());
   ipcMain.handle('ui:openDataDir', () => shell.openPath(storage.getDataDir()));
   ipcMain.handle('ui:openOutputDir', () => shell.openPath(storage.getOutputDir()));
+  ipcMain.handle('ui:openExtensionDir', () => shell.openPath(path.join(__dirname, '../../extension')));
   ipcMain.handle('ui:openExternal', (_, url) => shell.openExternal(url));
   ipcMain.handle('ui:exportAgentPlatform', () => exportToAgentPlatform());
 

@@ -62,6 +62,7 @@ contextBridge.exposeInMainWorld('pcbAPI', {
     openDigest:        () => ipcRenderer.invoke('ui:openDigest'),
     openDataDir:       () => ipcRenderer.invoke('ui:openDataDir'),
     openOutputDir:     () => ipcRenderer.invoke('ui:openOutputDir'),
+    openExtensionDir:  () => ipcRenderer.invoke('ui:openExtensionDir'),
     openExternal:      (url) => ipcRenderer.invoke('ui:openExternal', url),
     exportAgentPlatform:() => ipcRenderer.invoke('ui:exportAgentPlatform')
   },
