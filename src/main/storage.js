@@ -17,6 +17,7 @@ const HEALTH_FILE = path.join(DATA_DIR, 'health.json');
 
 const DEFAULT_SETTINGS = {
   refreshInterval: 30,
+  runAtStartup: false,
   collectOnStartup: true,
   maxItemsPerSource: 20,
   outputFormat: 'html',

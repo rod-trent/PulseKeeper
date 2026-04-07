@@ -88,6 +88,7 @@ app.whenReady().then(async () => {
   setupIPC();
 
   const settings = await storage.getSettings();
+  applyStartupSetting(settings.runAtStartup === true);
   if (settings.collectOnStartup) {
     setTimeout(() => collector.collectAll(), 2000);
   }
@@ -310,7 +311,11 @@ function setupIPC() {
   ipcMain.handle('content:getBySource', (_, id) => storage.getContent(id));
 
   ipcMain.handle('settings:get', () => storage.getSettings());
-  ipcMain.handle('settings:save', async (_, s) => { await storage.saveSettings(s); await scheduler.restart(); });
+  ipcMain.handle('settings:save', async (_, s) => {
+    await storage.saveSettings(s);
+    await scheduler.restart();
+    applyStartupSetting(s.runAtStartup === true);
+  });
   ipcMain.handle('settings:getProviders', () => getProviders());
 
   ipcMain.handle('output:openDigest', () => openDigest());
@@ -496,6 +501,21 @@ function crc32(buf) {
   let crc = 0xFFFFFFFF;
   for (const b of buf) crc = crc32.t[(crc ^ b) & 0xFF] ^ (crc >>> 8);
   return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// Apply or remove Windows startup (Run registry) entry via Electron login items
+function applyStartupSetting(enable) {
+  try {
+    const loginSettings = { openAtLogin: enable };
+    // In dev mode supply the electron exe + app path so the right command launches
+    if (!app.isPackaged) {
+      loginSettings.path = process.execPath;
+      loginSettings.args = [path.resolve(process.argv[1] || '.')];
+    }
+    app.setLoginItemSettings(loginSettings);
+  } catch (e) {
+    console.warn('[PulseKeeper] Could not set login item:', e.message);
+  }
 }
 
 // Copy bundled extension files into the user data folder (Documents\PulseKeeper\extension\)

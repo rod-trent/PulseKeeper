@@ -282,6 +282,7 @@ function populateSourceTypeDropdown() {
 async function loadSettings() {
   const s = await api.settings.get();
   document.getElementById('settingInterval').value = s.refreshInterval || 30;
+  document.getElementById('settingRunAtStartup').checked = s.runAtStartup === true;
   document.getElementById('settingCollectOnStartup').checked = s.collectOnStartup !== false;
   document.getElementById('settingMaxItems').value = s.maxItemsPerSource || 20;
   document.getElementById('settingOutputFormat').value = s.outputFormat || 'html';
@@ -297,6 +298,7 @@ async function saveSettings() {
   await api.settings.save({
     ...current,
     refreshInterval: parseInt(document.getElementById('settingInterval').value),
+    runAtStartup: document.getElementById('settingRunAtStartup').checked,
     collectOnStartup: document.getElementById('settingCollectOnStartup').checked,
     maxItemsPerSource: parseInt(document.getElementById('settingMaxItems').value),
     outputFormat: document.getElementById('settingOutputFormat').value,
