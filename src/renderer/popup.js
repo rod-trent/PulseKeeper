@@ -4,11 +4,11 @@ const api = window.pcbAPI;
 
 const SOURCE_COLORS = {
   rss: '#f26522', podcast: '#9b59b6', youtube: '#ff0000',
-  twitter: '#1da1f2', reddit: '#ff4500',
+  reddit: '#ff4500',
   newsletter: '#0078d4', blog: '#2ecc71', webpage: '#16a085', 'web-capture': '#8e44ad'
 };
 const SOURCE_ICONS = {
-  rss:'📡', podcast:'🎙️', youtube:'▶️', twitter:'🐦',
+  rss:'📡', podcast:'🎙️', youtube:'▶️',
   reddit:'🔴', newsletter:'📧', blog:'✍️', webpage:'🌐', 'web-capture':'🧩'
 };
 

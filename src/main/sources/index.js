@@ -2,7 +2,6 @@
 
 const { fetchRSS } = require('./rss');
 const { fetchYouTube } = require('./youtube');
-const { fetchTwitter } = require('./twitter');
 const { fetchReddit } = require('./reddit');
 const { fetchWebpage } = require('./webpage');
 
@@ -41,18 +40,6 @@ const SOURCE_TYPES = [
         required: true,
         hint: 'Most reliable: use the /channel/UCxxxxxx URL. Find it in YouTube Studio → Settings → Channel → Basic Info. @handle URLs are also tried automatically.'
       }
-    ]
-  },
-  {
-    id: 'twitter',
-    label: 'X / Twitter',
-    icon: 'twitter',
-    description: 'User timeline, list, or search query via API v2',
-    fields: [
-      { key: 'bearerToken', label: 'Bearer Token', type: 'password', placeholder: 'Get one at developer.twitter.com', required: true },
-      { key: 'username', label: 'Username', type: 'text', placeholder: '@jolly (without @)', required: false },
-      { key: 'searchQuery', label: 'Search Query', type: 'text', placeholder: '#topic OR from:user', required: false },
-      { key: 'listId', label: 'List ID', type: 'text', placeholder: '123456789', required: false }
     ]
   },
   {
@@ -119,8 +106,6 @@ async function fetchSource(source) {
       return fetchRSS(source);
     case 'youtube':
       return fetchYouTube(source);
-    case 'twitter':
-      return fetchTwitter(source);
     case 'reddit':
       return fetchReddit(source);
     case 'webpage':

@@ -2,15 +2,15 @@
 
 **Keep your pulse on the content that matters.**
 
-PulseKeeper is a Windows 11 system tray app built with Electron and Node.js. It aggregates content from RSS feeds, YouTube channels, X/Twitter, Reddit, podcasts, newsletters, blogs, and web pages, then delivers it as a clean digest in HTML, Markdown, or PDF. It also integrates directly with [AgentPlatform](https://github.com/rod-trent/AgentPlatform) for AI-powered summarization.
+PulseKeeper is a Windows 11 system tray app built with Electron and Node.js. It aggregates content from RSS feeds, YouTube channels, Reddit, podcasts, newsletters, blogs, and web pages, then delivers it as a clean digest in HTML, Markdown, or PDF. It also integrates directly with [AgentPlatform](https://github.com/rod-trent/AgentPlatform) for AI-powered summarization.
 
 ---
 
 ## Features
 
 - **System tray app** — lives quietly in the Windows 11 tray; left-click opens the content popup, right-click shows the menu
-- **Multiple source types** — RSS, YouTube, X/Twitter, Reddit, Podcasts, Newsletters, Blogs, Web Pages, and Browser Captures
-- **No API keys required** for RSS, YouTube, Reddit, and Podcast sources
+- **Multiple source types** — RSS, YouTube, Reddit, Podcasts, Newsletters, Blogs, Web Pages, and Browser Captures
+- **No API keys required** — every source type works without a developer account or credentials
 - **Unread badge** — tray icon shows a red dot with count when new content arrives
 - **Read tracking** — click any item to mark it read; "Mark All Read" button in the popup
 - **Source health monitoring** — each source card shows last fetch time and any errors
@@ -77,7 +77,6 @@ This produces a Windows NSIS installer in the `dist/` folder via [electron-build
 | **RSS / Atom** | Feed URL | No |
 | **Podcast** | Podcast RSS feed URL | No |
 | **YouTube** | Channel URL (`/channel/UCxxxxxx` recommended) or `@handle` | No |
-| **X / Twitter** | Username + Bearer token (Twitter API v2) | Yes |
 | **Reddit** | Subreddit name + sort (hot / new / top / rising) | No |
 | **Newsletter** | Feed URL (Substack, Beehiiv, Ghost, etc.) | No |
 | **Blog** | Feed URL | No |
