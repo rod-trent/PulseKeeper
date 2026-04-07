@@ -521,8 +521,12 @@ function applyStartupSetting(enable) {
 // Copy bundled extension files into the user data folder (Documents\PulseKeeper\extension\)
 // so users can load-unpacked from a stable, accessible location.
 function copyExtensionFiles(destDir) {
-  const srcDir = path.join(__dirname, '../../extension');
-  if (!fs.existsSync(srcDir)) return;           // no source folder — packaged build may embed differently
+  // When packaged the extension lives in resources/extension/ (extraResources);
+  // in dev it's at the repo root /extension/.
+  const srcDir = app.isPackaged
+    ? path.join(process.resourcesPath, 'extension')
+    : path.join(__dirname, '../../extension');
+  if (!fs.existsSync(srcDir)) return;
   try {
     _copyDirSync(srcDir, destDir);
   } catch (e) {

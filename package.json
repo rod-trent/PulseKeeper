@@ -1,12 +1,13 @@
 {
   "name": "pulsekeeper",
   "version": "1.0.0",
-  "description": "PulseKeeper — keep your pulse on the content that matters. Aggregates X, YouTube, Spotify, podcasts, blogs, RSS feeds, newsletters, and web pages.",
+  "description": "PulseKeeper — keep your pulse on the content that matters. Aggregates YouTube, podcasts, blogs, RSS feeds, newsletters, Reddit, and web pages.",
   "main": "src/main/index.js",
   "scripts": {
     "start": "electron --no-deprecation .",
     "build": "electron-builder --win",
     "build:dir": "electron-builder --win --dir",
+    "build:portable": "electron-builder --win portable",
     "postinstall": "electron-builder install-app-deps"
   },
   "keywords": ["electron", "rss", "content", "aggregator", "windows", "pulsekeeper"],
@@ -17,7 +18,6 @@
     "url": "https://github.com/rod-trent/PulseKeeper.git"
   },
   "dependencies": {
-    "electron": "^41.1.1",
     "rss-parser": "^3.13.0",
     "node-cron": "^3.0.3",
     "uuid": "^11.0.3",
@@ -26,23 +26,46 @@
     "cheerio": "^1.0.0"
   },
   "devDependencies": {
+    "electron": "^41.1.1",
     "electron-builder": "^26.8.1"
   },
   "build": {
     "appId": "com.rodtrent.pulsekeeper",
     "productName": "PulseKeeper",
+    "artifactName": "PulseKeeper-Setup-${version}.${ext}",
     "win": {
-      "target": ["nsis"],
-      "icon": "assets/icon.ico"
+      "target": [
+        { "target": "nsis",     "arch": ["x64"] },
+        { "target": "portable", "arch": ["x64"] }
+      ],
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "PulseKeeper",
+      "installerIcon": "assets/icon.png",
+      "uninstallerIcon": "assets/icon.png",
+      "license": "LICENSE"
+    },
+    "portable": {
+      "artifactName": "PulseKeeper-Portable-${version}.${ext}"
     },
     "files": [
       "src/**/*",
-      "assets/**/*",
-      "scripts/**/*"
+      "assets/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "scripts/",
+        "to":   "scripts/"
+      },
+      {
+        "from": "extension/",
+        "to":   "extension/"
+      }
     ]
   }
 }

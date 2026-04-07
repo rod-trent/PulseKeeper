@@ -5,9 +5,14 @@
 
 const path = require('path');
 const os = require('os');
+const { app } = require('electron');
 const { v4: uuidv4 } = require('uuid');
 
-const PK_BRIDGE_PATH = path.join(__dirname, '../../scripts/pk-bridge.js');
+// When packaged, scripts/ is placed as an extraResource outside the asar archive
+// so AgentPlatform can invoke it directly with `node`.
+const PK_BRIDGE_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'scripts', 'pk-bridge.js')
+  : path.join(__dirname, '../../scripts/pk-bridge.js');
 
 function buildCronExpr(intervalMinutes) {
   const mins = Math.max(5, Math.min(1440, intervalMinutes));
