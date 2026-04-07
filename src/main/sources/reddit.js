@@ -5,13 +5,20 @@ const https = require('https');
 const zlib = require('zlib');
 const Parser = require('rss-parser');
 
-// Reddit requires a descriptive non-browser User-Agent.
-// Browser strings and generic bots are blocked; Reddit-format UA is more permissive.
-const REDDIT_UA = 'windows:com.rodtrent.pulsekeeper:1.0.0 (by /u/pulsekeeper_app)';
+// Browser UA for the RSS web endpoint (Cloudflare blocks non-browser UAs)
+const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+// Reddit-format UA for the JSON API (Reddit requires this for app-style access)
+const REDDIT_UA  = 'windows:com.rodtrent.pulsekeeper:1.0.0 (by /u/pulsekeeper_app)';
 
 const rssParser = new Parser({
   timeout: 15000,
-  headers: { 'User-Agent': REDDIT_UA },
+  headers: {
+    'User-Agent': BROWSER_UA,
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.9',
+    'Accept-Encoding': 'gzip, deflate, br',
+    'Cache-Control': 'no-cache',
+  },
   customFields: {
     item: [
       ['media:thumbnail', 'mediaThumbnail'],
