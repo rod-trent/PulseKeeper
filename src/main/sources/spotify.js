@@ -64,6 +64,33 @@ async function getAccessToken(clientId, clientSecret) {
 }
 
 /**
+ * Extract a bare Spotify ID from any of:
+ *   https://open.spotify.com/show/27fvaXn7iGIsTM1RPlO9j6?si=...
+ *   spotify:show:27fvaXn7iGIsTM1RPlO9j6
+ *   27fvaXn7iGIsTM1RPlO9j6   (already bare)
+ */
+function extractSpotifyId(value) {
+  if (!value) return null;
+  const urlMatch = value.match(/open\.spotify\.com\/(?:show|episode|playlist|artist|album)\/([\w]+)/);
+  if (urlMatch) return urlMatch[1];
+  const uriMatch = value.match(/spotify:(?:show|episode|playlist|artist|album):([\w]+)/);
+  if (uriMatch) return uriMatch[1];
+  return value.trim().split('?')[0]; // strip any stray query string
+}
+
+/**
+ * Detect what type of content a Spotify URL/URI points to.
+ * Returns 'show' | 'playlist' | 'artist' | null
+ */
+function detectSpotifyType(value) {
+  if (!value) return null;
+  if (/open\.spotify\.com\/show\/|spotify:show:/.test(value))     return 'show';
+  if (/open\.spotify\.com\/playlist\/|spotify:playlist:/.test(value)) return 'playlist';
+  if (/open\.spotify\.com\/artist\/|spotify:artist:/.test(value))  return 'artist';
+  return null;
+}
+
+/**
  * Fetch from Spotify: playlist tracks, podcast episodes, or new releases
  */
 async function fetchSpotify(source) {
@@ -73,11 +100,25 @@ async function fetchSpotify(source) {
     throw new Error('Spotify source requires Client ID and Client Secret from developer.spotify.com');
   }
 
+  // Accept full URLs or spotify: URIs — extract just the ID portion
+  let playlistId = extractSpotifyId(config.playlistId);
+  let showId     = extractSpotifyId(config.showId);
+  let artistId   = extractSpotifyId(config.artistId);
+
+  // If a generic url field was set, auto-detect type and extract ID
+  if (config.url && !playlistId && !showId && !artistId) {
+    const type = detectSpotifyType(config.url);
+    const id   = extractSpotifyId(config.url);
+    if (type === 'show')     showId     = id;
+    else if (type === 'playlist') playlistId = id;
+    else if (type === 'artist')  artistId   = id;
+  }
+
   const token = await getAccessToken(config.clientId, config.clientSecret);
   const items = [];
 
-  if (config.playlistId) {
-    const data = await get(`/v1/playlists/${config.playlistId}/tracks?limit=${Math.min(maxItems, 50)}&fields=items(track(id,name,artists,album,external_urls,duration_ms,preview_url))`, token);
+  if (playlistId) {
+    const data = await get(`/v1/playlists/${playlistId}/tracks?limit=${Math.min(maxItems, 50)}&fields=items(track(id,name,artists,album,external_urls,duration_ms,preview_url))`, token);
     for (const entry of (data.items || []).slice(0, maxItems)) {
       const track = entry.track;
       if (!track) continue;
@@ -97,9 +138,9 @@ async function fetchSpotify(source) {
         fetchedAt: new Date().toISOString()
       });
     }
-  } else if (config.showId) {
+  } else if (showId) {
     // Podcast episodes
-    const data = await get(`/v1/shows/${config.showId}/episodes?limit=${Math.min(maxItems, 50)}`, token);
+    const data = await get(`/v1/shows/${showId}/episodes?limit=${Math.min(maxItems, 50)}`, token);
     for (const ep of (data.items || []).slice(0, maxItems)) {
       items.push({
         id: `spotify:${source.id}:${ep.id}`,
@@ -116,8 +157,8 @@ async function fetchSpotify(source) {
         fetchedAt: new Date().toISOString()
       });
     }
-  } else if (config.artistId) {
-    const data = await get(`/v1/artists/${config.artistId}/top-tracks?market=US`, token);
+  } else if (artistId) {
+    const data = await get(`/v1/artists/${artistId}/top-tracks?market=US`, token);
     for (const track of (data.tracks || []).slice(0, maxItems)) {
       items.push({
         id: `spotify:${source.id}:${track.id}`,

@@ -62,9 +62,9 @@ const SOURCE_TYPES = [
     fields: [
       { key: 'clientId', label: 'Client ID', type: 'text', placeholder: 'From developer.spotify.com', required: true },
       { key: 'clientSecret', label: 'Client Secret', type: 'password', placeholder: 'From developer.spotify.com', required: true },
-      { key: 'playlistId', label: 'Playlist ID', type: 'text', placeholder: 'spotify:playlist:... or the ID portion', required: false },
-      { key: 'showId', label: 'Podcast Show ID', type: 'text', placeholder: 'spotify:show:...', required: false },
-      { key: 'artistId', label: 'Artist ID', type: 'text', placeholder: 'spotify:artist:...', required: false }
+      { key: 'playlistId', label: 'Playlist URL or ID', type: 'text', placeholder: 'https://open.spotify.com/playlist/... or bare ID', required: false },
+      { key: 'showId', label: 'Podcast Show URL or ID', type: 'text', placeholder: 'https://open.spotify.com/show/... or bare ID', required: false },
+      { key: 'artistId', label: 'Artist URL or ID', type: 'text', placeholder: 'https://open.spotify.com/artist/... or bare ID', required: false }
     ]
   },
   {
