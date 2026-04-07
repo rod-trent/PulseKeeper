@@ -6,6 +6,7 @@
 
 const https = require('https');
 const http = require('http');
+const zlib = require('zlib');
 const crypto = require('crypto');
 
 // Try to load cheerio (optional dep — gracefully degrade if missing)
@@ -166,26 +167,44 @@ function fetchHTML(url) {
     const client = url.startsWith('https') ? https : http;
     const req = client.get(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br'
       }
     }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
         const loc = res.headers.location.startsWith('http')
           ? res.headers.location
           : new URL(res.headers.location, url).href;
-        fetchHTML(loc).then(resolve).catch(reject);
         res.resume();
+        fetchHTML(loc).then(resolve).catch(reject);
         return;
       }
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error(`HTTP ${res.statusCode} fetching: ${url}`));
+        return;
+      }
+
+      const enc = res.headers['content-encoding'];
+      let stream = res;
+      if (enc === 'gzip')    stream = res.pipe(zlib.createGunzip());
+      else if (enc === 'deflate') stream = res.pipe(zlib.createInflate());
+      else if (enc === 'br') stream = res.pipe(zlib.createBrotliDecompress());
+
       let data = '';
-      res.setEncoding('utf8');
-      res.on('data', c => { data += c; if (data.length > 2000000) { req.destroy(); resolve(data); } });
-      res.on('end', () => resolve(data));
+      let settled = false;
+      const done = v => { if (!settled) { settled = true; resolve(v); } };
+      const fail = e => { if (!settled) { settled = true; reject(e); } };
+
+      stream.setEncoding('utf8');
+      stream.on('data', c => { data += c; if (data.length > 2000000) { req.destroy(); done(data); } });
+      stream.on('end', () => done(data));
+      stream.on('error', () => { if (data.length > 100) done(data); else fail(new Error('Decompress error')); });
     });
     req.on('error', reject);
-    req.setTimeout(20000, () => { req.destroy(); reject(new Error('Timeout')); });
+    req.setTimeout(20000, () => { req.destroy(); reject(new Error('Timeout fetching: ' + url)); });
   });
 }
 

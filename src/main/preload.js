@@ -59,11 +59,12 @@ contextBridge.exposeInMainWorld('pcbAPI', {
     getLatest: () => ipcRenderer.invoke('popup:getLatest')
   },
 
-  // Events (main → renderer)
+  // Events (main → renderer) — removeAllListeners first to prevent accumulation
+  // if the renderer calls init() more than once
   on: {
-    collectStart: (fn) => ipcRenderer.on('collect:start', (_, d) => fn(d)),
-    collectComplete: (fn) => ipcRenderer.on('collect:complete', (_, d) => fn(d)),
-    collectError: (fn) => ipcRenderer.on('collect:sourceError', (_, d) => fn(d)),
-    navigate: (fn) => ipcRenderer.on('navigate', (_, tab) => fn(tab))
+    collectStart:    (fn) => { ipcRenderer.removeAllListeners('collect:start');    ipcRenderer.on('collect:start',    (_, d) => fn(d)); },
+    collectComplete: (fn) => { ipcRenderer.removeAllListeners('collect:complete'); ipcRenderer.on('collect:complete', (_, d) => fn(d)); },
+    collectError:    (fn) => { ipcRenderer.removeAllListeners('collect:sourceError'); ipcRenderer.on('collect:sourceError', (_, d) => fn(d)); },
+    navigate:        (fn) => { ipcRenderer.removeAllListeners('navigate');         ipcRenderer.on('navigate',         (_, tab) => fn(tab)); }
   }
 });

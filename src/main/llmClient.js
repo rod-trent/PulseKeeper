@@ -46,7 +46,7 @@ async function generateDigest(llmConfig, contentItems) {
 
   // Format content items for the prompt
   const contentText = contentItems.slice(0, 50).map((item, i) =>
-    `[${i + 1}] ${item.source} — ${item.title}\n${item.description || ''}\nURL: ${item.url}\nDate: ${item.publishedAt}`
+    `[${i + 1}] ${item.sourceName || item.sourceType || 'Unknown'} — ${item.title}\n${item.description || ''}\nURL: ${item.url}\nDate: ${item.publishedAt}`
   ).join('\n\n---\n\n');
 
   const systemPrompt = 'You are a personal content curator. Generate clear, concise digests with relevant highlights and links. Format your response in Markdown.';

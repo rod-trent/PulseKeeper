@@ -304,7 +304,7 @@ function setupIPC() {
   ipcMain.handle('ui:exportAgentPlatform', () => exportToAgentPlatform());
 
   ipcMain.handle('popup:close', () => { if (popupWin) popupWin.hide(); });
-  ipcMain.handle('popup:getLatest', async () => (await storage.getAllContent()).slice(0, 20));
+  ipcMain.handle('popup:getLatest', async () => (await storage.getAllContent()).slice(0, 100));
 }
 
 function broadcastToAll(channel, data) {

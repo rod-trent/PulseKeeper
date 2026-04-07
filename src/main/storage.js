@@ -63,6 +63,19 @@ const DEFAULT_SOURCES = [
   }
 ];
 
+function deepMerge(defaults, overrides) {
+  const result = { ...defaults };
+  for (const key of Object.keys(overrides)) {
+    if (overrides[key] !== null && typeof overrides[key] === 'object' && !Array.isArray(overrides[key])
+        && typeof defaults[key] === 'object' && defaults[key] !== null) {
+      result[key] = deepMerge(defaults[key], overrides[key]);
+    } else {
+      result[key] = overrides[key];
+    }
+  }
+  return result;
+}
+
 class Storage {
   constructor() {
     this._lock = false;
@@ -84,9 +97,9 @@ class Storage {
   async getSettings() {
     try {
       const raw = fs.readFileSync(SETTINGS_FILE, 'utf8');
-      return { ...DEFAULT_SETTINGS, ...JSON.parse(raw) };
+      return deepMerge(DEFAULT_SETTINGS, JSON.parse(raw));
     } catch {
-      return { ...DEFAULT_SETTINGS };
+      return deepMerge({}, DEFAULT_SETTINGS);
     }
   }
 
@@ -167,7 +180,12 @@ class Storage {
 
   async saveOutput(format, content) {
     const file = this.getOutputPath(format);
-    fs.writeFileSync(file, content, 'utf8');
+    // PDF content is a Buffer — don't force utf8 encoding on binary data
+    if (Buffer.isBuffer(content)) {
+      fs.writeFileSync(file, content);
+    } else {
+      fs.writeFileSync(file, content, 'utf8');
+    }
     return file;
   }
 
