@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src * data:">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src * data:; connect-src 'self' http://localhost:7828 http://127.0.0.1:7828">
   <title>PulseKeeper</title>
   <style>
     :root {
@@ -124,7 +124,7 @@
       <button class="popup-btn" id="btnCopy" title="Copy visible items as Markdown">📋</button>
       <button class="popup-btn" id="btnMarkAllRead" title="Mark all as read">✓ Read</button>
       <button class="popup-btn" id="btnRefreshPopup" title="Refresh">🔄</button>
-      <button class="popup-btn" onclick="window.pcbAPI.ui.openSettings()" title="Settings">⚙️</button>
+      <button class="popup-btn" id="btnSettings" title="Settings">⚙️</button>
       <button class="popup-btn primary" id="btnViewAll">View All</button>
     </div>
   </div>

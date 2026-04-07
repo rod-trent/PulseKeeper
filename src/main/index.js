@@ -23,6 +23,9 @@ const { discoverFeed } = require('./sources/rssDiscover');
 app.setAppUserModelId('com.rodtrent.pulsekeeper');
 app.setName('PulseKeeper');
 
+// Resolved once at startup; works in both dev (repo root) and packaged (inside asar).
+const APP_ICON_PATH = path.join(__dirname, '../../assets/icon.ico');
+
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { app.quit(); }
 
@@ -215,7 +218,7 @@ function openSettings(tab) {
     minHeight: 540,
     title: 'PulseKeeper',
     backgroundColor: '#1a1a2e',
-    icon: makePKIcon(32),
+    icon: APP_ICON_PATH,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -251,7 +254,7 @@ async function openDigest() {
       height: 820,
       title: 'PulseKeeper — Digest',
       backgroundColor: '#1a1a2e',
-      icon: makePKIcon(32),
+      icon: APP_ICON_PATH,
       webPreferences: { contextIsolation: true, nodeIntegration: false, webSecurity: false }
     });
     digestWin.loadFile(outPath);

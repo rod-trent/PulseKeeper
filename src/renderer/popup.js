@@ -35,6 +35,9 @@ async function init() {
   });
   document.getElementById('btnMarkAllRead').addEventListener('click', markAllRead);
   document.getElementById('btnCopy').addEventListener('click', copyToClipboard);
+  document.getElementById('btnSettings').addEventListener('click', () => {
+    api.ui.openSettings();
+  });
 
   api.on.collectStart(() => {
     document.getElementById('statusDot').className = 'status-dot collecting';
