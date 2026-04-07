@@ -31,15 +31,15 @@ const SOURCE_TYPES = [
     id: 'youtube',
     label: 'YouTube Channel / Playlist',
     icon: 'youtube',
-    description: 'Paste any YouTube channel URL or handle — no API key needed',
+    description: 'YouTube channel or playlist via public RSS — no API key needed',
     fields: [
       {
         key: 'url',
-        label: 'Channel URL or Handle',
+        label: 'Channel URL',
         type: 'url',
-        placeholder: 'https://www.youtube.com/@channelname  —or—  https://www.youtube.com/channel/UCxxxxxx',
+        placeholder: 'https://www.youtube.com/channel/UCxxxxxx',
         required: true,
-        hint: 'Accepts @handles, /channel/UC... IDs, /c/name, or playlist URLs'
+        hint: 'Most reliable: use the /channel/UCxxxxxx URL. Find it in YouTube Studio → Settings → Channel → Basic Info. @handle URLs are also tried automatically.'
       }
     ]
   },

@@ -104,14 +104,20 @@ async function resolveToFeedURL(url) {
   if (handleMatch) {
     const handle = handleMatch[1];
 
-    // 1. Legacy ?user= RSS URL (fast, works for older channels)
+    // 1. Legacy ?user= RSS URL (instant, no network round-trip to YouTube UI)
     const legacyUrl = `https://www.youtube.com/feeds/videos.xml?user=${handle}`;
     try {
       await parser.parseURL(legacyUrl);
       return legacyUrl;
     } catch { /* not a legacy username — continue */ }
 
-    // 2. Innertube API — YouTube's own internal API, returns JSON with channel ID
+    // 2. resolve_url — innertube endpoint designed specifically to canonicalise any YT URL
+    try {
+      const channelId = await resolveUrlViaInnertube(`https://www.youtube.com/@${handle}`);
+      return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
+    } catch { /* fall through */ }
+
+    // 3. browse — innertube channel browse endpoint, accepts @handle as browseId
     try {
       const channelId = await resolveHandleViaInnertube(handle);
       return `https://www.youtube.com/feeds/videos.xml?channel_id=${channelId}`;
@@ -161,17 +167,86 @@ async function resolveToFeedURL(url) {
   }
 
   throw new Error(
-    `Could not find YouTube RSS feed for: ${url}\n` +
-    `Try using the channel URL directly, e.g. https://www.youtube.com/channel/UC...\n` +
-    `Or find your channel ID via YouTube Studio → Settings → Channel → Basic Info`
+    `Could not resolve YouTube channel for: ${url}\n\n` +
+    `Most reliable fix: use the channel ID URL directly.\n` +
+    `  1. Go to the channel on YouTube\n` +
+    `  2. Click any video → right-click → Copy video URL\n` +
+    `     Or: YouTube Studio → Settings → Channel → Basic Info → Channel ID\n` +
+    `  3. Use: https://www.youtube.com/channel/UC<channelId>\n\n` +
+    `Example: https://www.youtube.com/channel/UCxxxxxxxxxxxxxxxxxxxxxx`
   );
 }
 
 /**
- * Resolve a YouTube @handle to a channel ID using YouTube's innertube API.
- * This is the most reliable method — it's the same JSON API the YouTube
- * web client uses internally, accepts @handles directly, returns structured
- * JSON with the channel ID clearly accessible. No API key required.
+ * Use the innertube navigation/resolve_url endpoint to turn any YouTube URL
+ * into a channel ID.  This is the most direct path — it's the same call
+ * the YouTube web app makes when routing a URL internally.
+ */
+function resolveUrlViaInnertube(youtubeUrl) {
+  const body = JSON.stringify({
+    context: {
+      client: { hl: 'en', gl: 'US', clientName: 'WEB', clientVersion: '2.20240304.00.00' }
+    },
+    url: youtubeUrl
+  });
+
+  return new Promise((resolve, reject) => {
+    const req = https.request({
+      hostname: 'www.youtube.com',
+      path: '/youtubei/v1/navigation/resolve_url?prettyPrint=false',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body),
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        'Accept': '*/*',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Origin': 'https://www.youtube.com',
+        'X-YouTube-Client-Name': '1',
+        'X-YouTube-Client-Version': '2.20240304.00.00',
+      }
+    }, (res) => {
+      const enc = res.headers['content-encoding'];
+      let stream = res;
+      if (enc === 'gzip')    stream = res.pipe(zlib.createGunzip());
+      else if (enc === 'deflate') stream = res.pipe(zlib.createInflate());
+      else if (enc === 'br') stream = res.pipe(zlib.createBrotliDecompress());
+
+      let data = '';
+      let settled = false;
+      const done = v => { if (!settled) { settled = true; resolve(v); } };
+      const fail = e => { if (!settled) { settled = true; reject(e); } };
+
+      stream.setEncoding('utf8');
+      stream.on('data', chunk => { data += chunk; if (data.length > 200000) req.destroy(); });
+      stream.on('end', () => {
+        if (!data) { fail(new Error('Empty resolve_url response')); return; }
+        try {
+          let channelId = null;
+          try {
+            const json = JSON.parse(data);
+            // endpoint.browseEndpoint.browseId is the canonical channel ID
+            channelId = json?.endpoint?.browseEndpoint?.browseId;
+          } catch { /* truncated — try regex */ }
+          if (!channelId) {
+            const m = data.match(/"browseId"\s*:\s*"(UC[\w-]+)"/);
+            channelId = m?.[1] || null;
+          }
+          if (channelId && channelId.startsWith('UC')) done(channelId);
+          else fail(new Error('No channel ID in resolve_url response'));
+        } catch (e) { fail(e); }
+      });
+      stream.on('error', fail);
+    });
+    req.on('error', reject);
+    req.setTimeout(15000, () => { req.destroy(); reject(new Error('resolve_url timed out')); });
+    req.write(body);
+    req.end();
+  });
+}
+
+/**
+ * Resolve a YouTube @handle to a channel ID using the innertube browse endpoint.
  */
 function resolveHandleViaInnertube(handle) {
   const body = JSON.stringify({
