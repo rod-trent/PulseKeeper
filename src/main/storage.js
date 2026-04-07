@@ -10,7 +10,8 @@ const SOURCES_FILE  = path.join(DATA_DIR, 'sources.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const CONTENT_DIR = path.join(DATA_DIR, 'content');
 const OUTPUT_DIR  = path.join(DATA_DIR, 'output');
-const HISTORY_DIR = path.join(DATA_DIR, 'history');
+const HISTORY_DIR   = path.join(DATA_DIR, 'history');
+const EXTENSION_DIR = path.join(DATA_DIR, 'extension');
 const READ_FILE   = path.join(DATA_DIR, 'read.json');
 const HEALTH_FILE = path.join(DATA_DIR, 'health.json');
 
@@ -87,7 +88,7 @@ class Storage {
   }
 
   async init() {
-    for (const dir of [DATA_DIR, CONTENT_DIR, OUTPUT_DIR, HISTORY_DIR]) {
+    for (const dir of [DATA_DIR, CONTENT_DIR, OUTPUT_DIR, HISTORY_DIR, EXTENSION_DIR]) {
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     }
     if (!fs.existsSync(SETTINGS_FILE)) await this._write(SETTINGS_FILE, DEFAULT_SETTINGS);
@@ -185,9 +186,10 @@ class Storage {
     return file;
   }
 
-  getDataDir()   { return DATA_DIR; }
-  getOutputDir() { return OUTPUT_DIR; }
-  getHistoryDir(){ return HISTORY_DIR; }
+  getDataDir()      { return DATA_DIR; }
+  getOutputDir()    { return OUTPUT_DIR; }
+  getHistoryDir()   { return HISTORY_DIR; }
+  getExtensionDir() { return EXTENSION_DIR; }
 
   // ─── Digest History ───────────────────────────────────────────────────────────
   async saveHistory(format, content) {

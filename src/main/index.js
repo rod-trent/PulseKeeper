@@ -51,6 +51,9 @@ app.whenReady().then(async () => {
   storage = new Storage();
   await storage.init();
 
+  // Copy bundled extension files to the user data folder so they can be loaded unpacked
+  copyExtensionFiles(storage.getExtensionDir());
+
   // Write icon file to disk so electron-builder can pick it up
   ensureIconFile();
 
@@ -326,7 +329,7 @@ function setupIPC() {
   ipcMain.handle('ui:openDigest', () => openDigest());
   ipcMain.handle('ui:openDataDir', () => shell.openPath(storage.getDataDir()));
   ipcMain.handle('ui:openOutputDir', () => shell.openPath(storage.getOutputDir()));
-  ipcMain.handle('ui:openExtensionDir', () => shell.openPath(path.join(__dirname, '../../extension')));
+  ipcMain.handle('ui:openExtensionDir', () => shell.openPath(storage.getExtensionDir()));
   ipcMain.handle('ui:openExternal', (_, url) => shell.openExternal(url));
   ipcMain.handle('ui:exportAgentPlatform', () => exportToAgentPlatform());
 
@@ -493,6 +496,31 @@ function crc32(buf) {
   let crc = 0xFFFFFFFF;
   for (const b of buf) crc = crc32.t[(crc ^ b) & 0xFF] ^ (crc >>> 8);
   return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
+// Copy bundled extension files into the user data folder (Documents\PulseKeeper\extension\)
+// so users can load-unpacked from a stable, accessible location.
+function copyExtensionFiles(destDir) {
+  const srcDir = path.join(__dirname, '../../extension');
+  if (!fs.existsSync(srcDir)) return;           // no source folder — packaged build may embed differently
+  try {
+    _copyDirSync(srcDir, destDir);
+  } catch (e) {
+    console.error('[PulseKeeper] Failed to copy extension files:', e.message);
+  }
+}
+
+function _copyDirSync(src, dest) {
+  if (!fs.existsSync(dest)) fs.mkdirSync(dest, { recursive: true });
+  for (const entry of fs.readdirSync(src, { withFileTypes: true })) {
+    const srcPath  = path.join(src,  entry.name);
+    const destPath = path.join(dest, entry.name);
+    if (entry.isDirectory()) {
+      _copyDirSync(srcPath, destPath);
+    } else {
+      fs.copyFileSync(srcPath, destPath);
+    }
+  }
 }
 
 // Write icon PNG to disk for electron-builder
