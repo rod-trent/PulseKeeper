@@ -61,11 +61,11 @@ const DEFAULT_SOURCES = [
   {
     id: uuidv4(),
     name: 'r/technology',
-    type: 'reddit',
+    type: 'rss',
     enabled: true,
-    config: { subreddit: 'technology' },
+    config: { url: 'https://www.reddit.com/r/technology.rss' },
     maxItems: 10,
-    icon: 'reddit'
+    icon: 'rss'
   }
 ];
 
