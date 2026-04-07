@@ -85,6 +85,14 @@
       {
         "from": "extension/",
         "to": "extension/"
+      },
+      {
+        "from": "assets/icon.ico",
+        "to": "icon.ico"
+      },
+      {
+        "from": "assets/icon.png",
+        "to": "icon.png"
       }
     ]
   }

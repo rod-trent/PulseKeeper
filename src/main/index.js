@@ -23,8 +23,12 @@ const { discoverFeed } = require('./sources/rssDiscover');
 app.setAppUserModelId('com.rodtrent.pulsekeeper');
 app.setName('PulseKeeper');
 
-// Resolved once at startup; works in both dev (repo root) and packaged (inside asar).
-const APP_ICON_PATH = path.join(__dirname, '../../assets/icon.ico');
+// When packaged, icon files must be outside the asar archive — Windows native
+// image loading cannot read from asar paths. They are placed in extraResources
+// so they land at process.resourcesPath as real filesystem files.
+const APP_ICON_PATH = app.isPackaged
+  ? path.join(process.resourcesPath, 'icon.ico')
+  : path.join(__dirname, '../../assets/icon.ico');
 
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) { app.quit(); }
