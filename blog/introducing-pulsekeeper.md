@@ -155,12 +155,7 @@ The easiest way to get PulseKeeper is to grab the official v1.0.0 release direct
 
 **[⬇ Download PulseKeeper v1.0.0](https://github.com/rod-trent/PulseKeeper/releases/tag/v1.0.0)**
 
-Two options are available:
-
-| Package | Description |
-|---|---|
-| **PulseKeeper-Setup-1.0.0.exe** | Full installer — creates Start Menu and desktop shortcuts |
-| **PulseKeeper-Portable-1.0.0.exe** | Single-file portable — no install required, just run it |
+Download **PulseKeeper-Setup-1.0.0.exe** — a full installer that creates Start Menu and desktop shortcuts.
 
 No Node.js. No npm. No command line. Download, run, done.
 
