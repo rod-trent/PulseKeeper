@@ -151,17 +151,29 @@ Think about what this actually means: you define your sources once in PulseKeepe
 
 ## Getting Started
 
-PulseKeeper requires Windows 10/11, Node.js 18 or later, and npm 9 or later. That's it.
+The easiest way to get PulseKeeper is to grab the official v1.0.0 release directly from GitHub:
+
+**[⬇ Download PulseKeeper v1.0.0](https://github.com/rod-trent/PulseKeeper/releases/tag/v1.0.0)**
+
+Two options are available:
+
+| Package | Description |
+|---|---|
+| **PulseKeeper-Setup-1.0.0.exe** | Full installer — creates Start Menu and desktop shortcuts |
+| **PulseKeeper-Portable-1.0.0.exe** | Single-file portable — no install required, just run it |
+
+No Node.js. No npm. No command line. Download, run, done.
+
+If you'd rather run from source, clone the repo and follow the standard setup:
 
 ```bash
 git clone https://github.com/rod-trent/PulseKeeper.git
 cd PulseKeeper
 npm install
-node extension/generate-icons.js
 npm start
 ```
 
-The app appears in your system tray immediately. Add your first source from the Content Sources tab, hit Collect Now, and your first items will appear within seconds.
+Either way, the app appears in your system tray immediately. Add your first source from the Content Sources tab, hit Collect Now, and your first items will appear within seconds.
 
 The full source code, documentation, and issue tracker are on GitHub at [https://github.com/rod-trent/PulseKeeper](https://github.com/rod-trent/PulseKeeper).
 

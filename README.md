@@ -43,7 +43,20 @@ PulseKeeper is a Windows 11 system tray app built with Electron and Node.js. It 
 
 ---
 
-## Requirements
+## Download
+
+**[⬇ Download v1.0.0](https://github.com/rod-trent/PulseKeeper/releases/tag/v1.0.0)**
+
+| Package | Description |
+|---|---|
+| **PulseKeeper-Setup-1.0.0.exe** | Full NSIS installer — creates Start Menu and desktop shortcuts |
+| **PulseKeeper-Portable-1.0.0.exe** | Single-file portable — no install required, just run it |
+
+No Node.js installation needed. The Electron runtime and all dependencies are bundled.
+
+---
+
+## Requirements (source / dev only)
 
 - Windows 10 / 11
 - [Node.js](https://nodejs.org/) 18 or later
