@@ -51,11 +51,32 @@
     .popup-btn.primary { background: var(--accent); color: white; border-color: var(--accent); }
     .popup-btn:hover { background: rgba(255,255,255,0.12); color: var(--text); }
     .popup-btn.primary:hover { background: #006cbe; }
-    .filter-row {
-      padding: 6px 12px; border-bottom: 1px solid var(--border);
-      display: flex; gap: 4px; overflow-x: auto; flex-shrink: 0; align-items: center;
+    .filter-row-wrap {
+      position: relative; flex-shrink: 0; border-bottom: 1px solid var(--border);
     }
-    .filter-row::-webkit-scrollbar { height: 0; }
+    /* Fade indicators — appear when row is scrollable */
+    .filter-row-wrap::before, .filter-row-wrap::after {
+      content: ''; position: absolute; top: 0; bottom: 4px; width: 24px;
+      pointer-events: none; z-index: 1; transition: opacity 0.15s;
+    }
+    .filter-row-wrap::before {
+      left: 0;
+      background: linear-gradient(to right, var(--bg), transparent);
+      opacity: 0;
+    }
+    .filter-row-wrap::after {
+      right: 0;
+      background: linear-gradient(to left, var(--bg), transparent);
+    }
+    .filter-row-wrap.scroll-start::before { opacity: 1; }
+    .filter-row-wrap.scroll-end::after   { opacity: 0; }
+    .filter-row {
+      padding: 6px 12px; display: flex; gap: 4px;
+      overflow-x: auto; align-items: center; scroll-behavior: smooth;
+    }
+    .filter-row::-webkit-scrollbar { height: 3px; }
+    .filter-row::-webkit-scrollbar-track { background: transparent; }
+    .filter-row::-webkit-scrollbar-thumb { background: rgba(96,205,255,0.25); border-radius: 2px; }
     .filter-chip {
       padding: 3px 10px; border-radius: 12px; font-size: 11px;
       border: 1px solid var(--border); background: transparent;
@@ -107,8 +128,10 @@
       <button class="popup-btn primary" id="btnViewAll">View All</button>
     </div>
   </div>
-  <div class="filter-row" id="filterRow">
-    <button class="filter-chip active" data-type="all">All</button>
+  <div class="filter-row-wrap" id="filterRowWrap">
+    <div class="filter-row" id="filterRow">
+      <button class="filter-chip active" data-type="all">All</button>
+    </div>
   </div>
   <div class="items-list" id="itemsList">
     <div class="loading"><div class="spinner"></div><span>Loading…</span></div>

@@ -18,6 +18,7 @@ let activeFilter = 'all';
 
 async function init() {
   await refresh();
+  initFilterScroll();
 
   // Delegated filter chip clicks
   document.getElementById('filterRow').addEventListener('click', e => {
@@ -72,6 +73,14 @@ function renderFilters() {
   for (const type of types) {
     const count = allItems.filter(i => i.sourceType === type).length;
     row.appendChild(makeChip(type, `${SOURCE_ICONS[type] || '📄'} ${type} (${count})`, activeFilter === type));
+  }
+
+  // Re-evaluate fade indicators after chips are rendered
+  const wrap = document.getElementById('filterRowWrap');
+  if (wrap) {
+    setTimeout(() => {
+      wrap.classList.toggle('scroll-end', row.scrollLeft + row.clientWidth >= row.scrollWidth - 4);
+    }, 0);
   }
 }
 
@@ -178,6 +187,30 @@ function relativeTime(dateStr) {
 
 function escHTML(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Filter row horizontal scrolling ──────────────────────────────────────────
+function initFilterScroll() {
+  const row  = document.getElementById('filterRow');
+  const wrap = document.getElementById('filterRowWrap');
+  if (!row || !wrap) return;
+
+  function updateFade() {
+    wrap.classList.toggle('scroll-start', row.scrollLeft > 4);
+    wrap.classList.toggle('scroll-end',   row.scrollLeft + row.clientWidth >= row.scrollWidth - 4);
+  }
+
+  // Translate vertical wheel to horizontal scroll
+  row.addEventListener('wheel', e => {
+    if (e.deltaY === 0) return;
+    e.preventDefault();
+    row.scrollBy({ left: e.deltaY * 1.5, behavior: 'smooth' });
+  }, { passive: false });
+
+  row.addEventListener('scroll', updateFade, { passive: true });
+
+  // Run once after chips are rendered so the fade-right appears if needed
+  setTimeout(updateFade, 50);
 }
 
 init();
