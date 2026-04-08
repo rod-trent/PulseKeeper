@@ -12,8 +12,6 @@ PulseKeeper is a Windows 11 system tray app built with Electron and Node.js. It 
 
 ![Supported Sources](Images/SupportedSources.png)
 
-![AgentPlatform Support](Images/AgentPlatformSupport.png)
-
 ![Agent Export](Images/AgentExport.png)
 
 ---
