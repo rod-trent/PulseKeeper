@@ -50,7 +50,7 @@ class CaptureServer {
 
     if (req.method === 'GET' && req.url === '/status') {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ app: 'PulseKeeper', version: '1.0.0', ok: true }));
+      res.end(JSON.stringify({ app: 'PulseKeeper', version: '1.1.0', ok: true }));
       return;
     }
 

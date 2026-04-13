@@ -2,6 +2,68 @@
 
 ---
 
+## v1.1.0 — April 13, 2026
+
+### What's New
+
+#### In-App Digest Browser
+- Navigation toolbar (Back, Forward, Reload, Home, URL bar, Open External) appears when viewing the HTML digest
+- Toolbar is automatically injected into external article pages so navigation is always available
+- **✕ Digest** close button returns to the digest from any article page
+- New setting: **Open Digest Articles In** — choose between the in-app viewer or your system default browser
+
+#### Content & Retention
+- New **Keep Records For** setting (1–5 days) — items older than the selected window are pruned automatically on each refresh
+- Digest viewer sidebar now shows **unread counts** per source type instead of total counts
+- Read items are visually dimmed in the digest viewer
+
+#### Popup Improvements
+- Filter chips now show live **unread counts** with red badges per source type
+- Chips update instantly when items are marked read
+- **Search bar** added to the popup for quick keyword filtering
+- **Mark All Read** now shows a 4-second undo toast before committing
+
+#### Digest Improvements
+- **Search bar** in the HTML digest filters items by title and description
+- **"New" badge** on items that weren't in the previous digest (diff since last generation)
+- Unread count shown in the digest header
+- New **Digest Font Size** setting: Small, Medium, or Large
+- **Auto Digest** — schedule a daily digest generation at a configurable time; saves to history and sends a notification
+
+#### Source Management
+- **Import OPML** — bulk-import RSS feeds from any OPML file via the Sources tab header
+- **Bypass Global Mute Words** toggle per source — individual sources can opt out of global mute filtering
+- **YouTube Playlist** badge shown on source cards when the configured URL is a playlist
+- **Unmuted** badge shown on source cards that bypass global mute words
+
+#### Health Dashboard
+- New **Health** tab in the main window with a full metrics view per source: last fetch time, new items, cached count, and error status
+
+#### Settings
+- Configurable **Max History Count** (5 / 10 / 20 / 30 / 50 digests) exposed in the Export tab
+- **Auto Digest** schedule (time picker + enable toggle) in the Settings tab
+
+#### Notifications
+- Clicking a Windows notification now opens the relevant content — refresh notification opens the popup; daily digest notification opens the digest
+
+#### Keyboard Shortcuts (main window)
+- `Ctrl+R` — Refresh all sources
+- `Ctrl+E` — Open digest
+- `Ctrl+,` — Jump to Settings tab
+- `Ctrl+N` — Add new source
+
+#### Theme
+- Theme now **automatically follows Windows dark/light mode**; manual toggle pins your preference and opts out of OS sync
+
+### Installation
+
+| Package | Description |
+|---|---|
+| `PulseKeeper-Setup-1.1.0.exe` | Full NSIS installer with Start Menu and desktop shortcuts |
+| `PulseKeeper-Portable-1.1.0.exe` | Single-file portable — no install required, just run it |
+
+---
+
 ## v1.0.0 — April 7, 2026
 
 **Initial public release.**
@@ -18,6 +80,8 @@ PulseKeeper is a Windows 11 system tray app that aggregates content from your ch
 |---|---|
 | `PulseKeeper-Setup-1.0.0.exe` | Full NSIS installer with Start Menu and desktop shortcuts |
 | `PulseKeeper-Portable-1.0.0.exe` | Single-file portable — no install required, just run it |
+
+**Requirements:** Windows 10 / 11 (x64). No other dependencies — Node.js is bundled.
 
 **Requirements:** Windows 10 / 11 (x64). No other dependencies — Node.js is bundled.
 
@@ -116,7 +180,7 @@ If a source type requires a developer account or API key to access publicly avai
 
 ### Getting Started
 
-Download `PulseKeeper-Setup-1.0.0.exe`, run the installer, and launch PulseKeeper from your Start Menu or desktop shortcut. The tray icon will appear in your system tray. Left-click to open the popup and add your first source from the **Content Sources** tab in settings.
+Download `PulseKeeper-Setup-1.1.0.exe`, run the installer, and launch PulseKeeper from your Start Menu or desktop shortcut. The tray icon will appear in your system tray. Left-click to open the popup and add your first source from the **Content Sources** tab in settings.
 
 Full documentation: [github.com/rod-trent/PulseKeeper](https://github.com/rod-trent/PulseKeeper)
 

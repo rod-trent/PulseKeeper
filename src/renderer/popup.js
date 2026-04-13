@@ -15,6 +15,7 @@ const SOURCE_ICONS = {
 let allItems = [];
 let readIds = new Set();
 let activeFilter = 'all';
+let searchQuery = '';
 
 async function init() {
   await refresh();
@@ -24,6 +25,12 @@ async function init() {
   document.getElementById('filterRow').addEventListener('click', e => {
     const chip = e.target.closest('[data-type]');
     if (chip) setFilter(chip.dataset.type, chip);
+  });
+
+  // Search input
+  document.getElementById('popupSearch').addEventListener('input', function() {
+    searchQuery = this.value.trim().toLowerCase();
+    renderItems();
   });
 
   // Header button handlers
@@ -70,12 +77,19 @@ function renderFilters() {
   const row = document.getElementById('filterRow');
   row.innerHTML = '';
 
-  const allChip = makeChip('all', `All (${allItems.length})`, activeFilter === 'all');
-  row.appendChild(allChip);
+  const totalUnread = allItems.filter(i => !readIds.has(i.id)).length;
+  const allLabel = totalUnread > 0
+    ? `All <span class="chip-unread">${totalUnread}</span>`
+    : `All (${allItems.length})`;
+  row.appendChild(makeChip('all', allLabel, activeFilter === 'all'));
 
   for (const type of types) {
-    const count = allItems.filter(i => i.sourceType === type).length;
-    row.appendChild(makeChip(type, `${SOURCE_ICONS[type] || '📄'} ${type} (${count})`, activeFilter === type));
+    const typeItems = allItems.filter(i => i.sourceType === type);
+    const unread = typeItems.filter(i => !readIds.has(i.id)).length;
+    const label = unread > 0
+      ? `${SOURCE_ICONS[type] || '📄'} ${type} <span class="chip-unread">${unread}</span>`
+      : `${SOURCE_ICONS[type] || '📄'} ${type} (${typeItems.length})`;
+    row.appendChild(makeChip(type, label, activeFilter === type));
   }
 
   // Re-evaluate fade indicators after chips are rendered
@@ -91,7 +105,7 @@ function makeChip(type, label, active) {
   const btn = document.createElement('button');
   btn.className = `filter-chip ${active ? 'active' : ''}`;
   btn.dataset.type = type;
-  btn.textContent = label;
+  btn.innerHTML = label;
   return btn;
 }
 
@@ -104,9 +118,16 @@ function setFilter(type, el) {
 
 function renderItems() {
   const list = document.getElementById('itemsList');
-  const filtered = activeFilter === 'all'
+  let filtered = activeFilter === 'all'
     ? allItems
     : allItems.filter(i => i.sourceType === activeFilter);
+
+  if (searchQuery) {
+    filtered = filtered.filter(i =>
+      (i.title || '').toLowerCase().includes(searchQuery) ||
+      (i.description || '').toLowerCase().includes(searchQuery)
+    );
+  }
 
   document.getElementById('itemCount').textContent = `${filtered.length} items`;
 
@@ -125,6 +146,7 @@ function renderItems() {
       readIds.add(item.id);
       el.classList.add('read');
       api.content.markRead([item.id]);
+      renderFilters(); // update unread badge counts on chips
     });
   });
 }
@@ -150,11 +172,26 @@ function renderItem(item, i) {
   </div>`;
 }
 
-async function markAllRead() {
-  await api.content.markAllRead();
+function markAllRead() {
   const items = activeFilter === 'all' ? allItems : allItems.filter(i => i.sourceType === activeFilter);
-  items.forEach(i => readIds.add(i.id));
-  document.querySelectorAll('.item').forEach(el => el.classList.add('read'));
+  if (!items.length) return;
+
+  // Show undo toast with 4-second window before committing
+  let cancelled = false;
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;bottom:52px;left:50%;transform:translateX(-50%);background:rgba(16,28,56,0.97);border:1px solid rgba(96,205,255,0.2);color:#f3f3f3;padding:6px 14px;border-radius:20px;font-size:11px;display:flex;align-items:center;gap:10px;z-index:999;box-shadow:0 4px 20px rgba(0,0,0,0.5)';
+  toast.innerHTML = `<span>Marking ${items.length} item${items.length !== 1 ? 's' : ''} as read…</span><button style="background:rgba(96,205,255,0.15);border:1px solid rgba(96,205,255,0.3);color:#60cdff;border-radius:10px;padding:2px 9px;cursor:pointer;font-size:11px">Undo</button>`;
+  document.body.appendChild(toast);
+  toast.querySelector('button').addEventListener('click', () => { cancelled = true; toast.remove(); });
+
+  setTimeout(async () => {
+    toast.remove();
+    if (cancelled) return;
+    await api.content.markAllRead();
+    items.forEach(i => readIds.add(i.id));
+    document.querySelectorAll('.item').forEach(el => el.classList.add('read'));
+    renderFilters();
+  }, 4000);
 }
 
 async function copyToClipboard() {

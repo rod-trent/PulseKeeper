@@ -81,8 +81,14 @@
       padding: 3px 10px; border-radius: 12px; font-size: 11px;
       border: 1px solid var(--border); background: transparent;
       color: var(--text2); cursor: pointer; white-space: nowrap; transition: all 0.15s;
+      display: flex; align-items: center; gap: 4px;
     }
     .filter-chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+    .chip-unread {
+      background: #e8112388; color: white; border-radius: 8px;
+      padding: 0 5px; font-size: 10px; font-weight: 600; line-height: 16px;
+    }
+    .filter-chip.active .chip-unread { background: rgba(255,255,255,0.3); }
     .items-list { flex: 1; overflow-y: auto; padding: 4px 0; }
     .items-list::-webkit-scrollbar { width: 4px; }
     .items-list::-webkit-scrollbar-thumb { background: rgba(96,205,255,0.15); border-radius: 2px; }
@@ -125,12 +131,20 @@
       <button class="popup-btn" id="btnMarkAllRead" title="Mark all as read">✓ Read</button>
       <button class="popup-btn" id="btnRefreshPopup" title="Refresh">🔄</button>
       <button class="popup-btn" id="btnSettings" title="Settings">⚙️</button>
-      <button class="popup-btn primary" id="btnViewAll">View All</button>
+      <button class="popup-btn primary" id="btnViewAll">Digest</button>
     </div>
   </div>
   <div class="filter-row-wrap" id="filterRowWrap">
     <div class="filter-row" id="filterRow">
       <button class="filter-chip active" data-type="all">All</button>
+    </div>
+  </div>
+  <div style="padding:5px 12px 0;flex-shrink:0">
+    <div style="position:relative">
+      <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12px;pointer-events:none;opacity:0.5">🔍</span>
+      <input id="popupSearch" type="search" placeholder="Search…" autocomplete="off"
+        style="width:100%;background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:6px;
+               padding:4px 8px 4px 28px;color:var(--text);font-size:11px;font-family:var(--font);outline:none;box-sizing:border-box">
     </div>
   </div>
   <div class="items-list" id="itemsList">

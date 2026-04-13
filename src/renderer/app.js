@@ -27,6 +27,11 @@ async function init() {
   api.on.collectError(({ name, error }) => showToast(`Error in ${name}: ${error}`, 'error'));
   api.on.navigate(tab => switchTab(tab));
   api.on.backupImported(() => { loadSources(); loadSettings(); showToast('Backup restored — reloading…'); });
+  api.on.sourcesUpdated(() => loadSources());
+  api.on.themeOsSync(({ theme }) => {
+    document.body.classList.toggle('theme-light', theme === 'light');
+    updateThemeButton(theme);
+  });
 }
 
 // ─── Navigation ───────────────────────────────────────────────────────────────
@@ -44,7 +49,8 @@ function switchTab(tabId) {
   const navItem = document.querySelector(`.nav-item[data-tab="${tabId}"]`);
   if (navItem) navItem.classList.add('active');
   if (tabId === 'extension') checkServerStatus();
-  if (tabId === 'export') loadHistory();
+  if (tabId === 'export') loadExportTab();
+  if (tabId === 'health') loadHealthDashboard();
 }
 
 // ─── Sources ──────────────────────────────────────────────────────────────────
@@ -78,10 +84,15 @@ function renderSourceCard(source) {
   const h = sourceHealth[source.id] || {};
   const healthHTML = renderHealthBadge(h, source);
 
+  const ytUrl = source.config?.url || source.config?.channelUrl || '';
+  const isPlaylist = source.type === 'youtube' && (ytUrl.includes('/playlist') || ytUrl.includes('list='));
+  const playlistBadge = isPlaylist ? ' <span style="font-size:10px;background:rgba(255,0,0,0.2);color:#ff6b6b;border:1px solid rgba(255,0,0,0.3);border-radius:4px;padding:1px 5px">Playlist</span>' : '';
+  const muteBadge = source.ignoreMute ? ' <span style="font-size:10px;background:rgba(255,193,7,0.15);color:#ffc107;border:1px solid rgba(255,193,7,0.3);border-radius:4px;padding:1px 5px" title="Bypasses global mute words">Unmuted</span>' : '';
+
   return `<div class="source-card ${source.enabled ? '' : 'disabled'}" id="source-${source.id}">
     <div class="source-icon ${typeClass}">${icon}</div>
     <div class="source-info">
-      <div class="source-name">${escapeHTML(source.name)}</div>
+      <div class="source-name">${escapeHTML(source.name)}${playlistBadge}${muteBadge}</div>
       <div class="source-meta">${typeInfo.label || source.type} · Max ${source.maxItems || 20} items${source.refreshInterval ? ` · ⏱ ${source.refreshInterval}m` : ''}</div>
       ${healthHTML}
     </div>
@@ -152,6 +163,7 @@ function openAddSource() {
   document.getElementById('sourceType').value = '';
   document.getElementById('sourceMaxItems').value = '20';
   document.getElementById('sourceRefreshInterval').value = '0';
+  document.getElementById('sourceIgnoreMute').checked = false;
   document.getElementById('sourceFields').innerHTML = '';
   document.getElementById('sourceTypeHint').textContent = '';
   document.getElementById('btnSaveSource').textContent = 'Add Source';
@@ -167,6 +179,7 @@ function openEditSource(id) {
   document.getElementById('sourceType').value = source.type;
   document.getElementById('sourceMaxItems').value = source.maxItems || 20;
   document.getElementById('sourceRefreshInterval').value = source.refreshInterval || 0;
+  document.getElementById('sourceIgnoreMute').checked = !!source.ignoreMute;
   document.getElementById('btnSaveSource').textContent = 'Save Changes';
   renderSourceFields(source.type, source.config || {});
   updateTypeHint(source.type);
@@ -233,6 +246,7 @@ async function saveSource() {
   const name = document.getElementById('sourceName').value.trim();
   const maxItems = parseInt(document.getElementById('sourceMaxItems').value) || 20;
   const refreshInterval = parseInt(document.getElementById('sourceRefreshInterval').value) || 0;
+  const ignoreMute = document.getElementById('sourceIgnoreMute').checked;
 
   if (!type) { showToast('Please select a source type', 'error'); return; }
   if (!name) { showToast('Please enter a display name', 'error'); return; }
@@ -257,10 +271,10 @@ async function saveSource() {
 
   try {
     if (editingSourceId) {
-      await api.sources.update(editingSourceId, { name, type, config, maxItems, refreshInterval });
+      await api.sources.update(editingSourceId, { name, type, config, maxItems, refreshInterval, ignoreMute });
       showToast('Source updated');
     } else {
-      await api.sources.add({ name, type, config, maxItems, refreshInterval });
+      await api.sources.add({ name, type, config, maxItems, refreshInterval, ignoreMute });
       showToast(`"${name}" added`);
     }
     closeModal();
@@ -285,7 +299,12 @@ async function loadSettings() {
   document.getElementById('settingRunAtStartup').checked = s.runAtStartup === true;
   document.getElementById('settingCollectOnStartup').checked = s.collectOnStartup !== false;
   document.getElementById('settingMaxItems').value = s.maxItemsPerSource || 20;
+  document.getElementById('settingRetentionDays').value = s.retentionDays || 3;
   document.getElementById('settingOutputFormat').value = s.outputFormat || 'html';
+  document.getElementById('settingDigestBrowser').value = s.digestBrowser || 'internal';
+  document.getElementById('settingDigestFontSize').value = s.display?.digestFontSize || 'medium';
+  document.getElementById('settingAutoDigestEnabled').checked = !!s.autoDigest?.enabled;
+  document.getElementById('settingAutoDigestTime').value = s.autoDigest?.time || '08:00';
   document.getElementById('settingNotifyEnabled').checked = s.notifications?.enabled !== false;
   document.getElementById('settingNotifyOnRefresh').checked = !!s.notifications?.onRefresh;
   document.getElementById('settingMuteWords').value = (s.muteWords || []).join(', ');
@@ -301,8 +320,18 @@ async function saveSettings() {
     runAtStartup: document.getElementById('settingRunAtStartup').checked,
     collectOnStartup: document.getElementById('settingCollectOnStartup').checked,
     maxItemsPerSource: parseInt(document.getElementById('settingMaxItems').value),
+    retentionDays: parseInt(document.getElementById('settingRetentionDays').value) || 3,
     outputFormat: document.getElementById('settingOutputFormat').value,
+    digestBrowser: document.getElementById('settingDigestBrowser').value,
+    display: {
+      ...(current.display || {}),
+      digestFontSize: document.getElementById('settingDigestFontSize').value
+    },
     muteWords,
+    autoDigest: {
+      enabled: document.getElementById('settingAutoDigestEnabled').checked,
+      time: document.getElementById('settingAutoDigestTime').value || '08:00'
+    },
     notifications: {
       enabled: document.getElementById('settingNotifyEnabled').checked,
       onRefresh: document.getElementById('settingNotifyOnRefresh').checked
@@ -390,12 +419,29 @@ function updateThemeButton(theme) {
 async function toggleTheme() {
   const s = await api.settings.get();
   const newTheme = (s.display?.theme || 'dark') === 'dark' ? 'light' : 'dark';
-  await api.settings.save({ ...s, display: { ...(s.display || {}), theme: newTheme } });
+  // Mark as pinned so OS sync won't override the user's explicit choice
+  await api.settings.save({ ...s, display: { ...(s.display || {}), theme: newTheme, themePinned: true } });
   document.body.classList.toggle('theme-light', newTheme === 'light');
   updateThemeButton(newTheme);
 }
 
 // ─── Digest History ────────────────────────────────────────────────────────────
+async function loadExportTab() {
+  const s = await api.settings.get();
+  const sel = document.getElementById('settingHistoryMaxCount');
+  if (sel) sel.value = String(s.historyMaxCount || 10);
+  await loadHistory();
+}
+
+async function saveHistorySettings() {
+  const current = await api.settings.get();
+  await api.settings.save({
+    ...current,
+    historyMaxCount: parseInt(document.getElementById('settingHistoryMaxCount').value) || 10
+  });
+  showToast('History settings saved');
+}
+
 async function loadHistory() {
   const el = document.getElementById('historyList');
   if (!el) return;
@@ -413,6 +459,54 @@ async function loadHistory() {
   el.querySelectorAll('[data-open-history]').forEach(btn => {
     btn.addEventListener('click', () => api.digest.openHistory(btn.dataset.openHistory));
   });
+}
+
+// ─── Health Dashboard ─────────────────────────────────────────────────────────
+async function loadHealthDashboard() {
+  const container = document.getElementById('healthList');
+  if (!container) return;
+  container.innerHTML = '<div class="empty-state"><div class="empty-icon">⏳</div><p>Loading…</p></div>';
+
+  const [allSources, health] = await Promise.all([api.sources.list(), api.sources.getHealth()]);
+
+  if (!allSources.length) {
+    container.innerHTML = '<div class="empty-state"><div class="empty-icon">📊</div><h3>No sources</h3><p>Add sources to see health metrics</p></div>';
+    return;
+  }
+
+  container.innerHTML = allSources.map(source => {
+    const h = health[source.id] || {};
+    const icon = getSourceIcon(source.type);
+    const ago = h.lastFetchedAt ? relativeTimeShort(h.lastFetchedAt) : 'Never';
+    const hasError = !!h.lastError;
+    const statusColor = !h.lastFetchedAt ? 'var(--text-disabled)' : hasError ? 'var(--red)' : '#6ccb5f';
+    const statusIcon = !h.lastFetchedAt ? '○' : hasError ? '✕' : '✓';
+
+    const metrics = [
+      { label: 'Last Fetch',  value: ago },
+      { label: 'New Items',   value: h.lastNewCount != null ? `+${h.lastNewCount}` : '—' },
+      { label: 'Cached',      value: h.totalCached != null ? h.totalCached : '—' },
+      { label: 'Status',      value: hasError ? 'Error' : (h.lastFetchedAt ? 'OK' : 'Pending') }
+    ];
+
+    return `<div class="source-card" style="flex-direction:column;gap:10px;align-items:stretch">
+      <div style="display:flex;align-items:center;gap:10px">
+        <div class="source-icon type-${source.type}">${icon}</div>
+        <div class="source-info" style="flex:1;min-width:0">
+          <div class="source-name">${escapeHTML(source.name)}</div>
+          <div class="source-meta">${source.type}${source.enabled ? '' : ' · <span style="color:var(--text-disabled)">disabled</span>'}</div>
+        </div>
+        <span style="font-size:16px;color:${statusColor}" title="${hasError ? escapeHTML(h.lastError) : 'OK'}">${statusIcon}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
+        ${metrics.map(m => `<div style="background:rgba(255,255,255,0.03);border:1px solid var(--border);border-radius:6px;padding:8px;text-align:center">
+          <div style="font-size:10px;color:var(--text-disabled);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">${m.label}</div>
+          <div style="font-size:13px;font-weight:500;color:${m.label==='Status'&&hasError?'var(--red)':m.label==='Status'&&h.lastFetchedAt?'#6ccb5f':'var(--text)'}">${m.value}</div>
+        </div>`).join('')}
+      </div>
+      ${hasError ? `<div style="background:rgba(209,52,56,0.1);border:1px solid rgba(209,52,56,0.3);border-radius:6px;padding:8px;font-size:11px;color:#fc8c8c">⚠ ${escapeHTML(h.lastError)}</div>` : ''}
+    </div>`;
+  }).join('');
 }
 
 // ─── RSS Discover ──────────────────────────────────────────────────────────────
@@ -481,6 +575,17 @@ function closeModal() {
 // ─── Event Listeners ───────────────────────────────────────────────────────────
 function setupEventListeners() {
   document.getElementById('btnAddSource').addEventListener('click', openAddSource);
+  document.getElementById('btnImportOPML').addEventListener('click', async () => {
+    try {
+      const result = await api.sources.importOPML();
+      if (result?.imported > 0) {
+        showToast(`${result.imported} feed${result.imported !== 1 ? 's' : ''} imported from OPML`);
+        await loadSources();
+      } else {
+        showToast('No feeds found in that OPML file', 'error');
+      }
+    } catch (e) { showToast(e.message, 'error'); }
+  });
   document.getElementById('btnRefreshAll').addEventListener('click', async () => {
     setStatus('Collecting all sources…', true);
     try {
@@ -491,6 +596,8 @@ function setupEventListeners() {
     } finally { setStatus('Ready', false); }
   });
   document.getElementById('btnSaveSettings').addEventListener('click', saveSettings);
+  document.getElementById('btnRefreshHealth').addEventListener('click', loadHealthDashboard);
+  document.getElementById('btnSaveHistorySettings').addEventListener('click', saveHistorySettings);
   document.getElementById('btnSaveSource').addEventListener('click', saveSource);
   document.getElementById('btnSaveLLM').addEventListener('click', saveLLMSettings);
   document.getElementById('btnTestLLM').addEventListener('click', testLLM);
@@ -539,7 +646,18 @@ function setupEventListeners() {
   document.getElementById('addSourceModal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeModal();
   });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  // Global keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closeModal(); return; }
+    // Don't fire shortcuts when typing in an input/textarea
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return;
+    if (e.ctrlKey && e.key === 'r') { e.preventDefault(); document.getElementById('btnRefreshAll').click(); }
+    if (e.ctrlKey && e.key === 'e') { e.preventDefault(); api.output.openDigest(); }
+    if (e.ctrlKey && e.key === ',') { e.preventDefault(); switchTab('settings'); }
+    if (e.ctrlKey && e.key === 'n') { e.preventDefault(); openAddSource(); }
+  });
 }
 
 // ─── Helpers ───────────────────────────────────────────────────────────────────

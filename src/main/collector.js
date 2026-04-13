@@ -85,7 +85,7 @@ class Collector {
         .map(w => w.toLowerCase().trim())
         .filter(Boolean);
 
-      if (muteWords.length) {
+      if (muteWords.length && !source.ignoreMute) {
         items = items.filter(item => {
           const text = `${item.title || ''} ${item.description || ''}`.toLowerCase();
           return !muteWords.some(w => text.includes(w));
@@ -97,8 +97,12 @@ class Collector {
       const existingIds = new Set(existing.map(i => i.id));
       const newItems = items.filter(i => !existingIds.has(i.id));
 
-      // Merge: new items at front, keep up to maxItems * 3 for history
-      const merged = [...newItems, ...existing].slice(0, (source.maxItems || 20) * 3);
+      // Merge new items at front, then apply retention window, then cap at maxItems * 3
+      const retentionMs = (settings.retentionDays || 3) * 86400000;
+      const cutoff = Date.now() - retentionMs;
+      const merged = [...newItems, ...existing]
+        .filter(i => new Date(i.fetchedAt || i.publishedAt || 0).getTime() > cutoff)
+        .slice(0, (source.maxItems || 20) * 3);
       await this.storage.saveContent(source.id, merged);
 
       // Update health

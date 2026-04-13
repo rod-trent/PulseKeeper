@@ -16,7 +16,8 @@ contextBridge.exposeInMainWorld('pcbAPI', {
     collectAll:   () => ipcRenderer.invoke('sources:collectAll'),
     isRunning:    (id) => ipcRenderer.invoke('sources:isRunning', id),
     getHealth:    () => ipcRenderer.invoke('sources:getHealth'),
-    discoverFeed: (url) => ipcRenderer.invoke('sources:discoverFeed', url)
+    discoverFeed: (url) => ipcRenderer.invoke('sources:discoverFeed', url),
+    importOPML:   () => ipcRenderer.invoke('sources:importOPML')
   },
 
   // Content
@@ -79,6 +80,8 @@ contextBridge.exposeInMainWorld('pcbAPI', {
     collectComplete: (fn) => { ipcRenderer.removeAllListeners('collect:complete'); ipcRenderer.on('collect:complete', (_, d) => fn(d)); },
     collectError:    (fn) => { ipcRenderer.removeAllListeners('collect:sourceError'); ipcRenderer.on('collect:sourceError', (_, d) => fn(d)); },
     navigate:        (fn) => { ipcRenderer.removeAllListeners('navigate');         ipcRenderer.on('navigate',         (_, tab) => fn(tab)); },
-    backupImported:  (fn) => { ipcRenderer.removeAllListeners('backup:imported');  ipcRenderer.on('backup:imported',  (_, d) => fn(d)); }
+    backupImported:  (fn) => { ipcRenderer.removeAllListeners('backup:imported');  ipcRenderer.on('backup:imported',  (_, d) => fn(d)); },
+    sourcesUpdated:  (fn) => { ipcRenderer.removeAllListeners('sources:updated');  ipcRenderer.on('sources:updated',  (_, d) => fn(d)); },
+    themeOsSync:     (fn) => { ipcRenderer.removeAllListeners('theme:osSync');     ipcRenderer.on('theme:osSync',     (_, d) => fn(d)); }
   }
 });

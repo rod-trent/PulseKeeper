@@ -8,7 +8,7 @@ const Parser = require('rss-parser');
 // Browser UA for the RSS web endpoint (Cloudflare blocks non-browser UAs)
 const BROWSER_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 // Reddit-format UA for the JSON API (Reddit requires this for app-style access)
-const REDDIT_UA  = 'windows:com.rodtrent.pulsekeeper:1.0.0 (by /u/pulsekeeper_app)';
+const REDDIT_UA  = 'windows:com.rodtrent.pulsekeeper:1.1.0 (by /u/pulsekeeper_app)';
 
 const rssParser = new Parser({
   timeout: 15000,

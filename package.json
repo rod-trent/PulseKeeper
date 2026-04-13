@@ -1,6 +1,6 @@
 {
   "name": "pulsekeeper",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "PulseKeeper — keep your pulse on the content that matters. Aggregates YouTube, podcasts, blogs, RSS feeds, newsletters, Reddit, and web pages.",
   "main": "src/main/index.js",
   "scripts": {

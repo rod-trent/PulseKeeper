@@ -31,7 +31,21 @@ const SOURCE_COLORS = {
  * Generate a full HTML digest page
  */
 function renderHTML(items, options = {}) {
-  const { title = 'Personal Content Digest', aiDigest = null, generatedAt = new Date() } = options;
+  const {
+    title = 'Personal Content Digest',
+    aiDigest = null,
+    generatedAt = new Date(),
+    readIds = new Set(),
+    digestBrowser = 'internal',
+    previousItemIds = new Set(),
+    digestFontSize = 'medium'
+  } = options;
+
+  const fontSizeMap = { small: '12px', medium: '14px', large: '17px' };
+  const baseFontSize = fontSizeMap[digestFontSize] || '14px';
+
+  const readIdsSet = readIds instanceof Set ? readIds : new Set(readIds || []);
+
   const dateStr = generatedAt.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
   const timeStr = generatedAt.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
 
@@ -43,12 +57,21 @@ function renderHTML(items, options = {}) {
     byType[t].push(item);
   }
 
-  const sidebarHTML = Object.entries(byType).map(([type, typeItems]) => `
-    <div class="sidebar-group">
-      <div class="sidebar-label">${SOURCE_ICONS[type] || '📄'} ${type.toUpperCase()} <span class="badge">${typeItems.length}</span></div>
-    </div>`).join('');
+  const totalUnread = items.filter(i => !readIdsSet.has(i.id)).length;
 
-  const itemsHTML = items.map(item => renderItemHTML(item)).join('\n');
+  const sidebarHTML = Object.entries(byType).map(([type, typeItems]) => {
+    const unread = typeItems.filter(i => !readIdsSet.has(i.id)).length;
+    const badgeClass = unread > 0 ? 'badge badge-unread' : 'badge badge-read';
+    const badgeLabel = unread > 0 ? `${unread} unread` : `${typeItems.length}`;
+    return `
+    <div class="sidebar-group">
+      <div class="sidebar-label">${SOURCE_ICONS[type] || '📄'} ${type.toUpperCase()} <span class="${badgeClass}">${badgeLabel}</span></div>
+    </div>`;
+  }).join('');
+
+  const prevIds = previousItemIds instanceof Set ? previousItemIds : new Set(previousItemIds || []);
+  const newSinceCount = prevIds.size > 0 ? items.filter(i => !prevIds.has(i.id)).length : 0;
+  const itemsHTML = items.map(item => renderItemHTML(item, readIdsSet, prevIds)).join('\n');
 
   const aiSection = aiDigest ? `
     <section class="ai-digest">
@@ -74,15 +97,73 @@ function renderHTML(items, options = {}) {
       --border: rgba(255,255,255,0.08);
       --card-bg: rgba(255,255,255,0.04);
       --shadow: 0 4px 20px rgba(0,0,0,0.4);
+      --nav-h: 0px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
       font-family: 'Segoe UI Variable', 'Segoe UI', system-ui, sans-serif;
+      font-size: ${baseFontSize};
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
       min-height: 100vh;
     }
+    /* ── Navigation toolbar (shown via JS when digestNav is available) ── */
+    .nav-toolbar {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      position: sticky;
+      top: 0;
+      z-index: 200;
+      background: #08081a;
+      border-bottom: 1px solid var(--border);
+      padding: 5px 12px;
+      height: 40px;
+    }
+    .nav-btn {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.1);
+      color: var(--text2);
+      border-radius: 5px;
+      padding: 3px 9px;
+      cursor: pointer;
+      font-size: 14px;
+      line-height: 1;
+      transition: all 0.15s;
+      flex-shrink: 0;
+    }
+    .nav-btn:disabled { opacity: 0.3; cursor: default; }
+    .nav-btn:not(:disabled):hover { background: rgba(255,255,255,0.14); color: var(--text); }
+    .nav-url {
+      flex: 1;
+      font-size: 11px;
+      color: var(--text2);
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 5px;
+      padding: 3px 10px;
+      min-width: 0;
+    }
+    .nav-sep { width: 1px; height: 18px; background: var(--border); flex-shrink: 0; }
+    .nav-btn-close {
+      background: rgba(0,120,212,0.15);
+      border: 1px solid rgba(0,120,212,0.35);
+      color: var(--accent2);
+      border-radius: 5px;
+      padding: 3px 11px;
+      cursor: pointer;
+      font-size: 12px;
+      font-family: inherit;
+      line-height: 1.4;
+      transition: all 0.15s;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .nav-btn-close:hover { background: rgba(0,120,212,0.3); border-color: var(--accent2); color: white; }
     .header {
       background: linear-gradient(135deg, #0a0a1a 0%, #0f3460 100%);
       border-bottom: 1px solid var(--border);
@@ -91,7 +172,7 @@ function renderHTML(items, options = {}) {
       align-items: center;
       justify-content: space-between;
       position: sticky;
-      top: 0;
+      top: var(--nav-h);
       z-index: 100;
       backdrop-filter: blur(20px);
     }
@@ -99,20 +180,22 @@ function renderHTML(items, options = {}) {
     .header-meta { color: var(--text2); font-size: 13px; }
     .header-stats { display: flex; gap: 16px; }
     .stat { background: var(--card-bg); padding: 6px 14px; border-radius: 20px; font-size: 12px; border: 1px solid var(--border); }
-    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 80px); }
+    .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 80px - var(--nav-h)); }
     .sidebar {
       background: var(--surface);
       border-right: 1px solid var(--border);
       padding: 20px 0;
       position: sticky;
-      top: 80px;
-      height: calc(100vh - 80px);
+      top: calc(80px + var(--nav-h));
+      height: calc(100vh - 80px - var(--nav-h));
       overflow-y: auto;
     }
     .sidebar-title { padding: 0 16px 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: var(--text2); }
     .sidebar-group { padding: 8px 16px; }
     .sidebar-label { font-size: 13px; color: var(--text2); display: flex; align-items: center; justify-content: space-between; }
-    .badge { background: var(--accent); color: white; border-radius: 10px; padding: 1px 7px; font-size: 10px; }
+    .badge { border-radius: 10px; padding: 1px 7px; font-size: 10px; }
+    .badge-unread { background: var(--accent); color: white; }
+    .badge-read   { background: rgba(255,255,255,0.1); color: var(--text2); }
     .main { padding: 24px 32px; max-width: 960px; }
     .ai-digest {
       background: linear-gradient(135deg, rgba(0,120,212,0.15), rgba(96,205,255,0.08));
@@ -200,6 +283,27 @@ function renderHTML(items, options = {}) {
     }
     .item-date { font-size: 11px; color: var(--text2); }
     .item-author { font-size: 11px; color: var(--text2); }
+    .search-bar {
+      margin-bottom: 12px;
+    }
+    .search-input {
+      width: 100%;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 14px 8px 36px;
+      color: var(--text);
+      font-size: 13px;
+      font-family: inherit;
+      outline: none;
+      transition: border-color 0.2s;
+      box-sizing: border-box;
+    }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--text2); }
+    .search-wrap { position: relative; }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; pointer-events: none; }
+    .no-results { text-align: center; color: var(--text2); padding: 40px 0; font-size: 13px; }
     .filter-bar {
       display: flex;
       gap: 8px;
@@ -221,6 +325,13 @@ function renderHTML(items, options = {}) {
       color: white;
       border-color: var(--accent);
     }
+    .item-card.is-read { opacity: 0.5; }
+    .item-card.is-read .item-title { font-weight: 400; }
+    .new-badge {
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px;
+      background: #107c10; color: white; border-radius: 4px; padding: 1px 5px;
+      vertical-align: middle; margin-left: 4px;
+    }
     .footer {
       border-top: 1px solid var(--border);
       padding: 16px 32px;
@@ -236,10 +347,23 @@ function renderHTML(items, options = {}) {
   </style>
 </head>
 <body>
+  <!-- Navigation toolbar — shown via JS when running inside the in-app viewer -->
+  <div class="nav-toolbar" id="navToolbar">
+    <button class="nav-btn" id="navBtnBack"    title="Back"                  disabled>&#8592;</button>
+    <button class="nav-btn" id="navBtnForward" title="Forward"               disabled>&#8594;</button>
+    <button class="nav-btn" id="navBtnReload"  title="Reload">&#8635;</button>
+    <button class="nav-btn" id="navBtnHome"    title="Return to digest">&#127968;</button>
+    <div class="nav-sep"></div>
+    <div class="nav-url" id="navUrlBar">PulseKeeper Digest</div>
+    <div class="nav-sep"></div>
+    <button class="nav-btn" id="navBtnExternal" title="Open current page in system browser">&#8599;</button>
+    <div class="nav-sep"></div>
+    <button class="nav-btn-close" id="navBtnClose" title="Return to digest">&#10005; Digest</button>
+  </div>
   <header class="header">
     <div>
       <div class="header-title">📰 ${escapeHTML(title)}</div>
-      <div class="header-meta">${dateStr} at ${timeStr}</div>
+      <div class="header-meta">${dateStr} at ${timeStr}${totalUnread > 0 ? ` · <strong style="color:var(--accent2)">${totalUnread} unread</strong>` : ''}${newSinceCount > 0 ? ` · <strong style="color:#6ccb5f">${newSinceCount} new since last digest</strong>` : ''}</div>
     </div>
     <div class="header-stats">
       ${Object.entries(byType).map(([type, typeItems]) =>
@@ -254,6 +378,12 @@ function renderHTML(items, options = {}) {
     </nav>
     <main class="main">
       ${aiSection}
+      <div class="search-bar">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input class="search-input" id="searchInput" type="search" placeholder="Search titles and descriptions…" autocomplete="off">
+        </div>
+      </div>
       <div class="filter-bar" id="filterBar">
         <button class="filter-btn active" data-filter="all">All (${items.length})</button>
         ${Object.entries(byType).map(([type, typeItems]) =>
@@ -269,39 +399,115 @@ function renderHTML(items, options = {}) {
     Generated by PulseKeeper · ${items.length} items from ${Object.keys(byType).length} source types
   </footer>
   <script>
+    const DIGEST_BROWSER = '${digestBrowser}';
+
+    // ── Search + filter state ─────────────────────────────────────────────────
+    let activeFilterType = 'all';
+    let searchQuery = '';
+
+    function applySearchFilter() {
+      const q = searchQuery.toLowerCase();
+      let visible = 0;
+      document.querySelectorAll('.item-card').forEach(card => {
+        const typeMatch = activeFilterType === 'all' || card.dataset.type === activeFilterType;
+        const textMatch = !q || card.dataset.title.includes(q) || card.dataset.desc.includes(q);
+        const show = typeMatch && textMatch;
+        card.style.display = show ? 'flex' : 'none';
+        if (show) visible++;
+      });
+      let noRes = document.getElementById('noResults');
+      if (!visible) {
+        if (!noRes) {
+          noRes = document.createElement('div');
+          noRes.id = 'noResults';
+          noRes.className = 'no-results';
+          noRes.textContent = 'No items match your search.';
+          document.getElementById('itemsGrid').after(noRes);
+        }
+      } else if (noRes) {
+        noRes.remove();
+      }
+    }
+
+    // ── Filter bar ────────────────────────────────────────────────────────────
     document.getElementById('filterBar').addEventListener('click', function(e) {
       const btn = e.target.closest('[data-filter]');
       if (!btn) return;
-      const type = btn.dataset.filter;
+      activeFilterType = btn.dataset.filter;
       document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
-      document.querySelectorAll('.item-card').forEach(card => {
-        card.style.display = (type === 'all' || card.dataset.type === type) ? 'flex' : 'none';
-      });
+      applySearchFilter();
     });
-    // Open links in default browser (when viewed in Electron)
+
+    // ── Search input ──────────────────────────────────────────────────────────
+    document.getElementById('searchInput').addEventListener('input', function() {
+      searchQuery = this.value.trim();
+      applySearchFilter();
+    });
+
+    // ── Link handling ─────────────────────────────────────────────────────────
     document.querySelectorAll('a.item-card').forEach(a => {
-      a.addEventListener('click', e => {
-        if (window.pcbAPI) { e.preventDefault(); window.pcbAPI.ui.openExternal(a.href); }
-      });
+      if (DIGEST_BROWSER === 'external') {
+        a.addEventListener('click', e => {
+          e.preventDefault();
+          if (window.digestNav) window.digestNav.openExternal(a.href);
+        });
+      } else {
+        // Internal: navigate within the viewer window
+        a.target = '_self';
+      }
     });
+
+    // ── Navigation toolbar ────────────────────────────────────────────────────
+    if (window.digestNav) {
+      // Show toolbar and activate --nav-h offset
+      const toolbar = document.getElementById('navToolbar');
+      toolbar.style.display = 'flex';
+      document.documentElement.style.setProperty('--nav-h', '40px');
+
+      const btnBack     = document.getElementById('navBtnBack');
+      const btnForward  = document.getElementById('navBtnForward');
+      const btnReload   = document.getElementById('navBtnReload');
+      const btnHome     = document.getElementById('navBtnHome');
+      const btnExternal = document.getElementById('navBtnExternal');
+      const btnClose    = document.getElementById('navBtnClose');
+      const urlBar      = document.getElementById('navUrlBar');
+
+      btnBack.addEventListener('click',     () => window.digestNav.back());
+      btnForward.addEventListener('click',  () => window.digestNav.forward());
+      btnReload.addEventListener('click',   () => window.digestNav.reload());
+      btnHome.addEventListener('click',     () => window.digestNav.home());
+      btnExternal.addEventListener('click', () => window.digestNav.openExternal(location.href));
+      btnClose.addEventListener('click',    () => window.digestNav.home());
+
+      window.digestNav.onNavState(state => {
+        btnBack.disabled    = !state.canGoBack;
+        btnForward.disabled = !state.canGoForward;
+        urlBar.textContent  = state.title || state.url || 'PulseKeeper Digest';
+        // Show the close/back-to-digest button only when browsing an external page
+        const onDigest = state.url && state.url.startsWith('file://');
+        btnClose.style.display = onDigest ? 'none' : 'block';
+      });
+    }
   </script>
 </body>
 </html>`;
 }
 
-function renderItemHTML(item) {
+function renderItemHTML(item, readIdsSet = new Set(), prevIds = new Set()) {
   const color = SOURCE_COLORS[item.sourceType] || '#666';
   const icon = SOURCE_ICONS[item.sourceType] || '📄';
   const dateStr = formatDate(item.publishedAt);
+  const isRead = readIdsSet.has(item.id);
+  const isNew = prevIds.size > 0 && !prevIds.has(item.id);
   const thumb = item.thumbnail
     ? `<img class="item-thumb" src="${escapeHTML(item.thumbnail)}" alt="" loading="lazy" onerror="this.style.display='none'">`
     : `<div class="item-thumb-placeholder">${icon}</div>`;
 
-  return `<a class="item-card" href="${escapeHTML(item.url)}" target="_blank" rel="noopener" data-type="${escapeHTML(item.sourceType || 'rss')}">
+  return `<a class="item-card${isRead ? ' is-read' : ''}" href="${escapeHTML(item.url)}" target="_blank" rel="noopener" data-type="${escapeHTML(item.sourceType || 'rss')}" data-id="${escapeHTML(item.id || '')}" data-title="${escapeHTML((item.title || '').toLowerCase())}" data-desc="${escapeHTML((item.description || '').toLowerCase())}">
     ${thumb}
     <div class="item-body">
-      <div class="item-title">${escapeHTML(item.title)}</div>
+      <div class="item-title">${escapeHTML(item.title)}${isNew ? '<span class="new-badge">New</span>' : ''}</div>
       <div class="item-desc">${escapeHTML(item.description || '')}</div>
       <div class="item-meta">
         <span class="source-badge" style="background:${color}">${icon} ${escapeHTML(item.sourceName)}</span>

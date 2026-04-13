@@ -21,6 +21,12 @@ const DEFAULT_SETTINGS = {
   collectOnStartup: true,
   maxItemsPerSource: 20,
   outputFormat: 'html',
+  digestBrowser: 'internal',
+  retentionDays: 3,
+  autoDigest: {
+    enabled: false,
+    time: '08:00'
+  },
   muteWords: [],
   historyMaxCount: 10,
   llm: {
@@ -36,7 +42,8 @@ const DEFAULT_SETTINGS = {
     accentColor: '#0078d4',
     showThumbnails: true,
     groupBySource: false,
-    sortBy: 'date'
+    sortBy: 'date',
+    digestFontSize: 'medium'
   },
   notifications: {
     enabled: true,

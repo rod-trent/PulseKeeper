@@ -36,6 +36,10 @@
         <span class="nav-icon">🤖</span>
         <span>AI / LLM</span>
       </div>
+      <div class="nav-item" data-tab="health">
+        <span class="nav-icon">📊</span>
+        <span>Health</span>
+      </div>
       <div class="nav-item" data-tab="export">
         <span class="nav-icon">📤</span>
         <span>Export</span>
@@ -64,6 +68,7 @@
           <div class="page-subtitle">Manage your feeds, channels, and monitored pages</div>
         </div>
         <div class="page-actions">
+          <button class="btn btn-secondary" id="btnImportOPML">📥 Import OPML</button>
           <button class="btn btn-secondary" id="btnRefreshAll">🔄 Refresh All</button>
           <button class="btn btn-primary" id="btnAddSource">+ Add Source</button>
         </div>
@@ -117,11 +122,22 @@
               <label class="form-label">Max Items per Source</label>
               <input type="number" class="input" id="settingMaxItems" value="20" min="5" max="100">
             </div>
+            <div class="form-group">
+              <label class="form-label">Keep Records For</label>
+              <select class="select" id="settingRetentionDays">
+                <option value="1">1 day</option>
+                <option value="2">2 days</option>
+                <option value="3" selected>3 days</option>
+                <option value="4">4 days</option>
+                <option value="5">5 days</option>
+              </select>
+              <div class="form-hint">Items older than this are pruned automatically on each refresh</div>
+            </div>
           </div>
         </div>
         <div class="card">
           <div class="card-header"><h3>📄 Output Format</h3></div>
-          <div class="card-body">
+          <div class="card-body" style="display:flex;flex-direction:column;gap:16px">
             <div class="form-group">
               <label class="form-label">Default Digest Format</label>
               <select class="select" id="settingOutputFormat">
@@ -129,6 +145,35 @@
                 <option value="markdown">Markdown (opens in editor)</option>
                 <option value="pdf">PDF (print-quality)</option>
               </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Open Digest Articles In</label>
+              <select class="select" id="settingDigestBrowser">
+                <option value="internal">In-app browser (built-in viewer)</option>
+                <option value="external">External browser (system default)</option>
+              </select>
+              <div class="form-hint">Controls where article links open when viewing the HTML digest</div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Digest Font Size</label>
+              <select class="select" id="settingDigestFontSize">
+                <option value="small">Small</option>
+                <option value="medium" selected>Medium</option>
+                <option value="large">Large</option>
+              </select>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <h3>⏰ Auto Digest</h3>
+            <label class="toggle"><input type="checkbox" id="settingAutoDigestEnabled"><span class="toggle-slider"></span></label>
+          </div>
+          <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+            <p style="font-size:12px;color:var(--text-secondary)">Automatically generate and save a digest every day at the specified time.</p>
+            <div class="form-group">
+              <label class="form-label">Generate Daily At</label>
+              <input type="time" class="input" id="settingAutoDigestTime" value="08:00">
             </div>
           </div>
         </div>
@@ -218,6 +263,22 @@
       </div>
     </div>
 
+    <!-- ── Health Tab ── -->
+    <div id="tab-health" class="tab-content" style="display:none">
+      <div class="page-header">
+        <div>
+          <div class="page-title">Source Health</div>
+          <div class="page-subtitle">Fetch metrics and error status for each source</div>
+        </div>
+        <div class="page-actions">
+          <button class="btn btn-secondary" id="btnRefreshHealth">🔄 Refresh</button>
+        </div>
+      </div>
+      <div style="padding:20px">
+        <div id="healthList" class="source-list"></div>
+      </div>
+    </div>
+
     <!-- ── Export Tab ── -->
     <div id="tab-export" class="tab-content" style="display:none">
       <div class="page-header">
@@ -252,14 +313,26 @@
         <div class="card">
           <div class="card-header">
             <h3>🕒 Digest History</h3>
-            <span style="font-size:11px;color:var(--text-disabled)">Last 10 HTML digests</span>
           </div>
-          <div class="card-body">
+          <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+            <div class="form-group">
+              <label class="form-label">Keep Last N Digests</label>
+              <select class="select" id="settingHistoryMaxCount">
+                <option value="5">5 digests</option>
+                <option value="10" selected>10 digests</option>
+                <option value="20">20 digests</option>
+                <option value="30">30 digests</option>
+                <option value="50">50 digests</option>
+              </select>
+              <div class="form-hint">Older digests are automatically deleted</div>
+            </div>
+            <button class="btn btn-primary btn-sm" id="btnSaveHistorySettings" style="align-self:flex-start">Save</button>
             <div class="history-list" id="historyList">
               <div style="color:var(--text-disabled);font-size:12px">Loading…</div>
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
 
@@ -320,7 +393,7 @@
             </svg>
             <h2 style="margin-bottom:8px">PulseKeeper</h2>
             <p style="margin-bottom:6px;font-size:13px">Keep your pulse on the content that matters.</p>
-            <p style="font-size:12px;color:var(--text-disabled);margin-bottom:20px">Version 1.0.0 · Windows 11 · Electron</p>
+            <p style="font-size:12px;color:var(--text-disabled);margin-bottom:20px">Version 1.1.0 · Windows 11 · Electron</p>
             <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
               <button class="btn btn-secondary" onclick="window.pcbAPI.ui.openExternal('https://github.com/rod-trent/PulseKeeper')">GitHub Repository</button>
               <button class="btn btn-secondary" onclick="window.pcbAPI.ui.openExternal('https://github.com/rod-trent/AgentPlatform')">AgentPlatform</button>
@@ -377,6 +450,13 @@
           <input type="number" class="input" id="sourceRefreshInterval" value="0" min="0" max="1440" placeholder="0 = use global">
           <div class="form-hint">0 = use the global schedule</div>
         </div>
+      </div>
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:4px 0">
+        <div>
+          <label class="form-label" style="margin:0">Bypass Global Mute Words</label>
+          <div class="form-hint">Show all items from this source even if they match muted words</div>
+        </div>
+        <label class="toggle"><input type="checkbox" id="sourceIgnoreMute"><span class="toggle-slider"></span></label>
       </div>
       <div id="sourceFields"></div>
     </div>
